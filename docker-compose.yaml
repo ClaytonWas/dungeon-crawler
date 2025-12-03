@@ -1,0 +1,51 @@
+services:
+  server:
+    build:
+      context: ./server
+    ports:
+      - "3030:3030"
+    volumes:
+      - ./server/scenes:/app/scenes
+    environment:
+      - PORT=3030
+      - GAME_SERVER_PORT=3030
+      - PROFILE_SERVER_URL=${PROFILE_SERVER_URL:-http://localhost:3000}
+      - SECRET_KEY=${SECRET_KEY:-dungeoncrawler}
+      - JWT_SECRET=${JWT_SECRET:-${SECRET_KEY:-dungeoncrawler}}
+    restart: unless-stopped
+
+  profile-api:
+    build:
+      context: ./client
+      dockerfile: Dockerfile.api
+    ports:
+      - "3001:3001"
+    environment:
+      - PORT=3001
+      - SECRET_KEY=${SECRET_KEY:-dungeoncrawler}
+      - JWT_SECRET=${JWT_SECRET:-${SECRET_KEY:-dungeoncrawler}}
+    volumes:
+      - ./client/db:/app/db
+    restart: unless-stopped
+
+  profile-client:
+    build:
+      context: ./client/profile-client
+    ports:
+      - "3000:3000"
+    depends_on:
+      - profile-api
+    restart: unless-stopped
+
+  game:
+    build:
+      context: ./client/game-client
+      args:
+        - VITE_PROFILE_SERVER_URL=http://localhost:3000
+    ports:
+      - "5173:5173"
+    depends_on:
+      - server
+      - profile-api
+    restart: unless-stopped
+

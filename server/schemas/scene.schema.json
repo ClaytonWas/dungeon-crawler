@@ -1,0 +1,320 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "Scene Definition Schema",
+  "description": "Industry-standard scene definition for 3D world loading",
+  "type": "object",
+  "required": ["meta", "environment"],
+  "properties": {
+    "meta": {
+      "type": "object",
+      "required": ["id", "version", "type"],
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Unique scene identifier"
+        },
+        "version": {
+          "type": "string",
+          "pattern": "^\\d+\\.\\d+\\.\\d+$",
+          "description": "Semantic version (e.g., 1.0.0)"
+        },
+        "type": {
+          "type": "string",
+          "enum": ["hub", "dungeon", "arena", "town", "world"],
+          "description": "Scene type/category"
+        },
+        "name": {
+          "type": "string",
+          "description": "Human-readable name"
+        },
+        "description": {
+          "type": "string"
+        },
+        "author": {
+          "type": "string"
+        },
+        "tags": {
+          "type": "array",
+          "items": { "type": "string" }
+        }
+      }
+    },
+    "environment": {
+      "type": "object",
+      "properties": {
+        "bounds": {
+          "type": "object",
+          "properties": {
+            "min": { "type": "array", "items": { "type": "number" }, "minItems": 3, "maxItems": 3 },
+            "max": { "type": "array", "items": { "type": "number" }, "minItems": 3, "maxItems": 3 }
+          }
+        },
+        "spawn": {
+          "type": "object",
+          "properties": {
+            "position": { "type": "array", "items": { "type": "number" }, "minItems": 3, "maxItems": 3 },
+            "rotation": { "type": "array", "items": { "type": "number" }, "minItems": 3, "maxItems": 3 }
+          }
+        },
+        "skybox": {
+          "type": "object",
+          "properties": {
+            "type": { "type": "string", "enum": ["color", "gradient", "cubemap", "hdri"] },
+            "color": { "type": "string" },
+            "topColor": { "type": "string" },
+            "bottomColor": { "type": "string" },
+            "textures": { "type": "array", "items": { "type": "string" } }
+          }
+        },
+        "fog": {
+          "type": "object",
+          "properties": {
+            "enabled": { "type": "boolean" },
+            "type": { "type": "string", "enum": ["linear", "exp", "exp2"] },
+            "color": { "type": "string" },
+            "density": { "type": "number" },
+            "near": { "type": "number" },
+            "far": { "type": "number" }
+          }
+        },
+        "ambient": {
+          "type": "object",
+          "properties": {
+            "color": { "type": "string" },
+            "intensity": { "type": "number", "minimum": 0, "maximum": 10 }
+          }
+        }
+      }
+    },
+    "lights": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["id", "type"],
+        "properties": {
+          "id": { "type": "string" },
+          "type": { "type": "string", "enum": ["ambient", "directional", "point", "spot", "hemisphere", "area"] },
+          "enabled": { "type": "boolean", "default": true },
+          "color": { "type": "string" },
+          "intensity": { "type": "number" },
+          "position": { "type": "array", "items": { "type": "number" }, "minItems": 3, "maxItems": 3 },
+          "rotation": { "type": "array", "items": { "type": "number" }, "minItems": 3, "maxItems": 3 },
+          "target": { "type": "array", "items": { "type": "number" }, "minItems": 3, "maxItems": 3 },
+          "distance": { "type": "number" },
+          "decay": { "type": "number" },
+          "angle": { "type": "number" },
+          "penumbra": { "type": "number" },
+          "castShadow": { "type": "boolean" },
+          "shadowBias": { "type": "number" },
+          "shadowMapSize": { "type": "array", "items": { "type": "integer" }, "minItems": 2, "maxItems": 2 }
+        }
+      }
+    },
+    "nodes": {
+      "type": "array",
+      "description": "Scene graph nodes (meshes, empties, groups)",
+      "items": {
+        "type": "object",
+        "required": ["id", "type"],
+        "properties": {
+          "id": { "type": "string" },
+          "type": { "type": "string", "enum": ["mesh", "group", "empty", "instance"] },
+          "name": { "type": "string" },
+          "enabled": { "type": "boolean", "default": true },
+          "transform": {
+            "type": "object",
+            "properties": {
+              "position": { "type": "array", "items": { "type": "number" }, "minItems": 3, "maxItems": 3 },
+              "rotation": { "type": "array", "items": { "type": "number" }, "minItems": 3, "maxItems": 3 },
+              "scale": { 
+                "oneOf": [
+                  { "type": "number" },
+                  { "type": "array", "items": { "type": "number" }, "minItems": 3, "maxItems": 3 }
+                ]
+              }
+            }
+          },
+          "geometry": {
+            "type": "object",
+            "properties": {
+              "type": { "type": "string" },
+              "primitive": { "type": "string", "enum": ["box", "sphere", "cylinder", "cone", "plane", "torus", "custom"] },
+              "parameters": { "type": "object" },
+              "model": { "type": "string", "description": "Path to GLTF/GLB model" }
+            }
+          },
+          "material": {
+            "type": "object",
+            "properties": {
+              "type": { "type": "string", "enum": ["standard", "basic", "phong", "physical", "toon", "custom"] },
+              "color": { "type": "string" },
+              "emissive": { "type": "string" },
+              "emissiveIntensity": { "type": "number" },
+              "roughness": { "type": "number", "minimum": 0, "maximum": 1 },
+              "metalness": { "type": "number", "minimum": 0, "maximum": 1 },
+              "opacity": { "type": "number", "minimum": 0, "maximum": 1 },
+              "transparent": { "type": "boolean" },
+              "wireframe": { "type": "boolean" },
+              "side": { "type": "string", "enum": ["front", "back", "double"] },
+              "textures": {
+                "type": "object",
+                "properties": {
+                  "map": { "type": "string" },
+                  "normalMap": { "type": "string" },
+                  "roughnessMap": { "type": "string" },
+                  "metalnessMap": { "type": "string" },
+                  "aoMap": { "type": "string" }
+                }
+              }
+            }
+          },
+          "rendering": {
+            "type": "object",
+            "properties": {
+              "castShadow": { "type": "boolean" },
+              "receiveShadow": { "type": "boolean" },
+              "visible": { "type": "boolean", "default": true },
+              "renderOrder": { "type": "integer" },
+              "frustumCulled": { "type": "boolean", "default": true }
+            }
+          },
+          "physics": {
+            "type": "object",
+            "properties": {
+              "enabled": { "type": "boolean" },
+              "type": { "type": "string", "enum": ["static", "dynamic", "kinematic"] },
+              "collider": {
+                "type": "object",
+                "properties": {
+                  "shape": { "type": "string", "enum": ["box", "sphere", "cylinder", "capsule", "mesh", "convex"] },
+                  "size": { "type": "array", "items": { "type": "number" } },
+                  "offset": { "type": "array", "items": { "type": "number" }, "minItems": 3, "maxItems": 3 }
+                }
+              },
+              "mass": { "type": "number" },
+              "friction": { "type": "number" },
+              "restitution": { "type": "number" }
+            }
+          },
+          "children": {
+            "type": "array",
+            "items": { "type": "string" },
+            "description": "IDs of child nodes"
+          },
+          "instances": {
+            "type": "array",
+            "description": "For instanced rendering",
+            "items": {
+              "type": "object",
+              "properties": {
+                "position": { "type": "array", "items": { "type": "number" }, "minItems": 3, "maxItems": 3 },
+                "rotation": { "type": "array", "items": { "type": "number" }, "minItems": 3, "maxItems": 3 },
+                "scale": { 
+                  "oneOf": [
+                    { "type": "number" },
+                    { "type": "array", "items": { "type": "number" }, "minItems": 3, "maxItems": 3 }
+                  ]
+                }
+              }
+            }
+          },
+          "userData": {
+            "type": "object",
+            "description": "Custom game-specific data"
+          }
+        }
+      }
+    },
+    "gameplay": {
+      "type": "object",
+      "properties": {
+        "triggers": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": ["id", "type", "action"],
+            "properties": {
+              "id": { "type": "string" },
+              "type": { "type": "string", "enum": ["box", "sphere", "cylinder"] },
+              "position": { "type": "array", "items": { "type": "number" }, "minItems": 3, "maxItems": 3 },
+              "size": { "type": "array", "items": { "type": "number" } },
+              "radius": { "type": "number" },
+              "action": { "type": "string" },
+              "data": { "type": "object" },
+              "oneTime": { "type": "boolean" },
+              "enabled": { "type": "boolean", "default": true }
+            }
+          }
+        },
+        "spawners": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": ["id", "entityType"],
+            "properties": {
+              "id": { "type": "string" },
+              "entityType": { "type": "string", "enum": ["enemy", "npc", "item", "prop"] },
+              "position": { "type": "array", "items": { "type": "number" }, "minItems": 3, "maxItems": 3 },
+              "rotation": { "type": "array", "items": { "type": "number" }, "minItems": 3, "maxItems": 3 },
+              "count": { "type": "integer", "minimum": 1 },
+              "radius": { "type": "number" },
+              "enemyType": { "type": "string" },
+              "level": { "type": "integer" },
+              "respawn": { "type": "boolean" },
+              "respawnTime": { "type": "number" },
+              "enabled": { "type": "boolean", "default": true },
+              "data": { "type": "object" }
+            }
+          }
+        },
+        "navmesh": {
+          "type": "object",
+          "properties": {
+            "enabled": { "type": "boolean" },
+            "source": { "type": "string", "description": "Path to navmesh file" },
+            "cellSize": { "type": "number" },
+            "cellHeight": { "type": "number" },
+            "agentHeight": { "type": "number" },
+            "agentRadius": { "type": "number" }
+          }
+        },
+        "zones": {
+          "type": "array",
+          "description": "Gameplay zones (safe zones, PvP, etc.)",
+          "items": {
+            "type": "object",
+            "required": ["id", "type"],
+            "properties": {
+              "id": { "type": "string" },
+              "type": { "type": "string" },
+              "shape": { "type": "string", "enum": ["box", "sphere", "polygon"] },
+              "bounds": { "type": "object" },
+              "properties": { "type": "object" }
+            }
+          }
+        }
+      }
+    },
+    "lod": {
+      "type": "object",
+      "description": "Level of Detail configuration",
+      "properties": {
+        "enabled": { "type": "boolean" },
+        "distances": { "type": "array", "items": { "type": "number" } },
+        "strategy": { "type": "string", "enum": ["distance", "screenSize", "hybrid"] }
+      }
+    },
+    "optimization": {
+      "type": "object",
+      "properties": {
+        "occlusion": { "type": "boolean", "description": "Occlusion culling" },
+        "frustumCulling": { "type": "boolean", "default": true },
+        "instancedRendering": { "type": "boolean", "default": true },
+        "texturePacking": { "type": "boolean" },
+        "maxDrawCalls": { "type": "integer" },
+        "targetFPS": { "type": "integer", "default": 60 }
+      }
+    }
+  }
+}
+

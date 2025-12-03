@@ -1,0 +1,178 @@
+{
+  "meta": {
+    "id": "hub_world",
+    "version": "1.0.0",
+    "type": "hub",
+    "name": "Crimson Hub",
+    "description": "The central gathering place where adventurers prepare for their journeys",
+    "author": "Dungeon Crawler Team",
+    "tags": ["hub", "social", "safe-zone"]
+  },
+  "environment": {
+    "bounds": {
+      "min": [-50, 0, -50],
+      "max": [50, 20, 50]
+    },
+    "spawn": {
+      "position": [0, 1, 0],
+      "rotation": [0, 0, 0]
+    },
+    "skybox": {
+      "type": "color",
+      "color": "0x1a0a0f"
+    },
+    "fog": {
+      "enabled": true,
+      "type": "exp2",
+      "color": "0x1a0a0f",
+      "density": 0.01
+    },
+    "ambient": {
+      "color": "0x606060",
+      "intensity": 0.8
+    }
+  },
+  "lights": [
+    {
+      "id": "sun",
+      "type": "directional",
+      "color": "0xffffff",
+      "intensity": 2.0,
+      "position": [10, 20, 10],
+      "target": [0, 0, 0],
+      "castShadow": true,
+      "shadowMapSize": [2048, 2048]
+    },
+    {
+      "id": "torch-north",
+      "type": "point",
+      "color": "0xff6600",
+      "intensity": 50.0,
+      "position": [15, 6, 0],
+      "distance": 50,
+      "decay": 1
+    },
+    {
+      "id": "torch-east",
+      "type": "point",
+      "color": "0xff6600",
+      "intensity": 50.0,
+      "position": [0, 6, 15],
+      "distance": 50,
+      "decay": 1
+    },
+    {
+      "id": "torch-south",
+      "type": "point",
+      "color": "0xff6600",
+      "intensity": 1500.0,
+      "position": [-15, 6, 0],
+      "distance": 50,
+      "decay": 1
+    },
+    {
+      "id": "torch-west",
+      "type": "point",
+      "color": "0xff6600",
+      "intensity": 50.0,
+      "position": [0, 6, -15],
+      "distance": 50,
+      "decay": 1
+    }
+  ],
+  "nodes": [
+    {
+      "id": "central-platform",
+      "type": "mesh",
+      "name": "Central Platform",
+      "geometry": {
+        "primitive": "cylinder",
+        "parameters": {
+          "radiusTop": 5,
+          "radiusBottom": 6,
+          "height": 0.5,
+          "radialSegments": 8
+        }
+      },
+      "material": {
+        "type": "standard",
+        "color": "0x4a2a2f"
+      },
+      "transform": {
+        "position": [0, 0.25, 0]
+      },
+      "rendering": {
+        "castShadow": true,
+        "receiveShadow": true
+      },
+      "physics": {
+        "enabled": true,
+        "type": "static",
+        "collider": {
+          "shape": "cylinder",
+          "size": [6.5, 0.5]
+        }
+      }
+    },
+    {
+      "id": "pillars",
+      "type": "instance",
+      "name": "Support Pillars",
+      "geometry": {
+        "primitive": "cylinder",
+        "parameters": {
+          "radius": 0.5,
+          "height": 8,
+          "radialSegments": 8
+        }
+      },
+      "material": {
+        "type": "standard",
+        "color": "0x3a1a1f"
+      },
+      "rendering": {
+        "castShadow": true
+      },
+      "instances": [
+        { "position": [15, 4, 0] },
+        { "position": [0, 4, 15] },
+        { "position": [-15, 4, 0] },
+        { "position": [0, 4, -15] }
+      ],
+      "physics": {
+        "enabled": true,
+        "type": "static",
+        "collider": {
+          "shape": "cylinder",
+          "size": [0.6, 8]
+        }
+      }
+    }
+  ],
+  "gameplay": {
+    "triggers": [],
+    "spawners": [],
+    "zones": [
+      {
+        "id": "safe-zone",
+        "type": "safe",
+        "shape": "sphere",
+        "bounds": {
+          "center": [0, 1, 0],
+          "radius": 50
+        },
+        "properties": {
+          "pvpDisabled": true,
+          "noEnemies": true
+        }
+      }
+    ]
+  },
+  "optimization": {
+    "occlusion": false,
+    "frustumCulling": true,
+    "instancedRendering": true,
+    "targetFPS": 60
+  }
+}
+

@@ -1,0 +1,212 @@
+{
+  "meta": {
+    "id": "dungeon_corridor",
+    "version": "1.0.0",
+    "type": "dungeon",
+    "name": "Dark Corridor",
+    "description": "A narrow stone corridor filled with lurking enemies",
+    "author": "Dungeon Crawler Team",
+    "tags": ["dungeon", "corridor", "dark"]
+  },
+  "environment": {
+    "bounds": {
+      "min": [-30, 0, -30],
+      "max": [30, 10, 30]
+    },
+    "spawn": {
+      "position": [0, 1, -20],
+      "rotation": [0, 0, 0]
+    },
+    "skybox": {
+      "type": "color",
+      "color": "0x0a0a0a"
+    },
+    "fog": {
+      "enabled": true,
+      "type": "exp2",
+      "color": "0x000000",
+      "density": 0.03
+    },
+    "ambient": {
+      "color": "0x404040",
+      "intensity": 0.4
+    }
+  },
+  "lights": [
+    {
+      "id": "dim-overhead",
+      "type": "directional",
+      "color": "0x8888bb",
+      "intensity": 0.6,
+      "position": [0, 10, 0],
+      "target": [0, 0, 0]
+    },
+    {
+      "id": "entrance-light",
+      "type": "point",
+      "color": "0xff4444",
+      "intensity": 1.5,
+      "position": [0, 3, -18],
+      "distance": 15,
+      "decay": 2
+    },
+    {
+      "id": "exit-light",
+      "type": "point",
+      "color": "0x44ff44",
+      "intensity": 1.5,
+      "position": [0, 3, 18],
+      "distance": 15,
+      "decay": 2
+    }
+  ],
+  "nodes": [
+    {
+      "id": "floor",
+      "type": "mesh",
+      "geometry": {
+        "primitive": "plane",
+        "parameters": {
+          "width": 40,
+          "height": 60
+        }
+      },
+      "material": {
+        "type": "standard",
+        "color": "0x222222",
+        "roughness": 0.9
+      },
+      "transform": {
+        "position": [0, 0.5, 0],
+        "rotation": [-1.5708, 0, 0]
+      },
+      "rendering": {
+        "receiveShadow": true
+      }
+    },
+    {
+      "id": "wall-left",
+      "type": "mesh",
+      "geometry": {
+        "primitive": "box",
+        "parameters": {
+          "width": 1,
+          "height": 5,
+          "depth": 60
+        }
+      },
+      "material": {
+        "type": "standard",
+        "color": "0x333333",
+        "roughness": 0.8
+      },
+      "transform": {
+        "position": [-20, 2.5, 0]
+      },
+      "rendering": {
+        "castShadow": true,
+        "receiveShadow": true
+      }
+    },
+    {
+      "id": "wall-right",
+      "type": "mesh",
+      "geometry": {
+        "primitive": "box",
+        "parameters": {
+          "width": 1,
+          "height": 5,
+          "depth": 60
+        }
+      },
+      "material": {
+        "type": "standard",
+        "color": "0x333333",
+        "roughness": 0.8
+      },
+      "transform": {
+        "position": [20, 2.5, 0]
+      },
+      "rendering": {
+        "castShadow": true,
+        "receiveShadow": true
+      }
+    },
+    {
+      "id": "support-columns",
+      "type": "instance",
+      "geometry": {
+        "primitive": "cylinder",
+        "parameters": {
+          "radius": 0.4,
+          "height": 5,
+          "radialSegments": 6
+        }
+      },
+      "material": {
+        "type": "standard",
+        "color": "0x2a2a2a"
+      },
+      "rendering": {
+        "castShadow": true
+      },
+      "instances": [
+        { "position": [-15, 2.5, -15] },
+        { "position": [15, 2.5, -15] },
+        { "position": [-15, 2.5, 0] },
+        { "position": [15, 2.5, 0] },
+        { "position": [-15, 2.5, 15] },
+        { "position": [15, 2.5, 15] }
+      ]
+    }
+  ],
+  "gameplay": {
+    "triggers": [
+      {
+        "id": "room-complete",
+        "type": "sphere",
+        "position": [0, 1, 18],
+        "radius": 3,
+        "action": "checkRoomComplete",
+        "data": {
+          "message": "All enemies defeated! Move to the exit."
+        }
+      }
+    ],
+    "spawners": [
+      {
+        "id": "spawn-group-1",
+        "entityType": "enemy",
+        "position": [0, 1, -10],
+        "count": 2,
+        "radius": 3,
+        "enabled": true
+      },
+      {
+        "id": "spawn-group-2",
+        "entityType": "enemy",
+        "position": [-10, 1, 0],
+        "count": 2,
+        "radius": 3,
+        "enabled": true
+      },
+      {
+        "id": "spawn-group-3",
+        "entityType": "enemy",
+        "position": [10, 1, 0],
+        "count": 2,
+        "radius": 3,
+        "enabled": true
+      },
+      {
+        "id": "spawn-group-4",
+        "entityType": "enemy",
+        "position": [0, 1, 10],
+        "count": 3,
+        "radius": 3,
+        "enabled": true
+      }
+    ]
+  }
+}
+

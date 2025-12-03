@@ -1,0 +1,86 @@
+import { useState, useEffect } from 'react'
+import { useSocket } from './hooks/useSocket'
+import { useGameStore } from './stores/gameStore'
+import GameCanvas from './components/GameCanvas'
+import RightPanel from './components/RightPanel'
+
+function App() {
+  const [token, setToken] = useState(null)
+  const { connected, panelCollapsed, setPanelCollapsed } = useGameStore()
+  
+  useEffect(() => {
+    // Get token from localStorage or URL params
+    const storedToken = localStorage.getItem('token')
+    const urlParams = new URLSearchParams(window.location.search)
+    const urlToken = urlParams.get('token')
+    
+    if (urlToken) {
+      localStorage.setItem('token', urlToken)
+      setToken(urlToken)
+      // Clean URL
+      window.history.replaceState({}, document.title, window.location.pathname)
+    } else if (storedToken) {
+      setToken(storedToken)
+    } else {
+      // Redirect to login
+      window.location.href = '/login'
+    }
+  }, [])
+  
+  // Initialize socket connection
+  useSocket(token)
+  
+  if (!token) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="text-xl text-gray-400">Loading...</div>
+      </div>
+    )
+  }
+  
+  return (
+    <div className="h-screen w-screen flex relative" style={{ overflow: 'hidden' }}>
+      {/* Game Canvas */}
+      <div className="flex-1 relative" style={{ minWidth: 0 }}>
+        <GameCanvas />
+        
+        {/* Connection status */}
+        <div 
+          className={`absolute top-4 left-4 px-3 py-1 rounded-full text-xs font-semibold ${
+            connected ? 'bg-green-900/50 text-green-400' : 'bg-red-900/50 text-red-400'
+          }`}
+          style={{ zIndex: 1000 }}
+        >
+          {connected ? '● Connected' : '○ Disconnected'}
+        </div>
+        
+        {/* FPS Counter */}
+        <div 
+          className="absolute top-4 left-4 mt-10 px-3 py-1 rounded-full text-xs font-semibold bg-gray-900/50 text-gray-300"
+          style={{ zIndex: 1000 }}
+          id="fps-counter"
+        >
+          FPS: 0
+        </div>
+      </div>
+      
+      {/* Right Panel - slides in/out instead of disappearing */}
+      <RightPanel />
+      
+      {/* Collapsed Panel Button - rendered at root level */}
+      {panelCollapsed && (
+        <button
+          onClick={() => setPanelCollapsed(false)}
+          className="fixed right-0 top-1/2 -translate-y-1/2 px-3 py-6 glass rounded-l-lg hover:bg-blood/50 transition-colors shadow-lg"
+          style={{ zIndex: 10000 }}
+          title="Show Panel"
+        >
+          <span className="text-white text-xl">◄</span>
+        </button>
+      )}
+    </div>
+  )
+}
+
+export default App
+

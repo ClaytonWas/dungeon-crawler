@@ -1,0 +1,89 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --blood-red: #8B0000;
+  --crimson: #DC143C;
+  --dark-purple: #4C0B5F;
+  --dark-gold: #B8860B;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  padding: 0;
+  font-family: 'Cinzel', 'Crimson Text', serif;
+  background: linear-gradient(to bottom right, rgba(40, 0, 10, 0.95), rgba(10, 5, 15, 0.98), rgba(25, 0, 20, 0.95));
+  min-height: 100vh;
+  color: #F3F4F6;
+}
+
+/* Custom scrollbar */
+::-webkit-scrollbar {
+  width: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: rgba(20, 5, 10, 0.5);
+}
+
+::-webkit-scrollbar-thumb {
+  background: rgba(139, 0, 0, 0.6);
+  border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: rgba(220, 20, 60, 0.8);
+}
+
+/* Glass morphism utility */
+.glass {
+  background: rgba(20, 5, 10, 0.7);
+  backdrop-filter: blur(10px);
+  border: 1px solid rgba(139, 0, 0, 0.3);
+}
+
+.glass-hover:hover {
+  background: rgba(30, 8, 12, 0.8);
+  border-color: rgba(220, 20, 60, 0.5);
+}
+
+/* Button base styles */
+.btn-primary {
+  @apply px-4 py-2 bg-blood/70 text-white border border-crimson/30 rounded-lg font-semibold text-sm uppercase tracking-wider transition-all duration-200;
+}
+
+.btn-primary:hover {
+  @apply bg-crimson/80 transform -translate-y-0.5;
+}
+
+.btn-secondary {
+  @apply px-4 py-2 bg-gray-700/50 text-white border border-gray-600/30 rounded-lg font-semibold text-sm uppercase tracking-wider transition-all duration-200;
+}
+
+.btn-secondary:hover {
+  @apply bg-gray-600/70;
+}
+
+/* Input styles */
+.input-field {
+  @apply w-full px-3 py-2 bg-black/30 border border-blood/30 rounded-lg text-white placeholder-gray-500 focus:outline-none focus:border-crimson/60 focus:ring-2 focus:ring-blood/20 transition-all;
+}
+
+/* Tab styles */
+.tab-btn {
+  @apply px-4 py-2 text-sm font-semibold uppercase tracking-wider transition-all duration-200 border-b-2 border-transparent;
+}
+
+.tab-btn.active {
+  @apply text-crimson border-crimson;
+}
+
+.tab-btn:not(.active) {
+  @apply text-gray-400 hover:text-gray-200;
+}
+

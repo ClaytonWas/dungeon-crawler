@@ -1,0 +1,21 @@
+{
+  "name": "dungeon-crawler",
+  "version": "1.0.0",
+  "description": "4-Player Dungeon Crawler Game",
+  "main": "index.js",
+  "scripts": {
+    "start": "docker-compose up",
+    "build": "docker-compose build",
+    "dev": "docker-compose up --build",
+    "test": "cd server && npm test && cd ../client && npm test",
+    "test:server": "cd server && npm test",
+    "test:client": "cd client && npm test"
+  },
+  "keywords": ["dungeon", "crawler", "multiplayer", "game"],
+  "author": "",
+  "license": "ISC",
+  "devDependencies": {
+    "jest": "^29.7.0"
+  }
+}
+
