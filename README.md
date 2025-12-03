@@ -43,21 +43,22 @@ A real-time multiplayer dungeon crawler with **Vampire Survivors-style combat**,
 
 ### Services Overview
 
+
 ```
 ┌───────────────────────────────────────────────────────────────────┐
-│                        Docker Compose                              │
-├─────────────┬─────────────┬─────────────┬────────────────────────┤
-│ Profile     │ Profile     │ Game Server │ Game Client            │
-│ Client      │ API         │             │ (React/Three.js)       │
-│ (React)     │ (Express)   │ (Socket.IO) │                        │
-│             │             │             │                        │
-│ Port: 3000  │ Port: 3001  │ Port: 3030  │ Port: 5173            │
-│ ─────────   │ ─────────   │ ─────────   │ ─────────             │
-│ • Login UI  │ • Auth API  │ • Gameplay  │ • Three.js Rendering  │
-│ • Register  │ • Sessions  │ • Combat    │ • Game UI/Tabs        │
-│ • Dashboard │ • SQLite    │ • Parties   │ • Socket.IO Client    │
-│ • Routing   │ • Play Ticket Auth│ • Chat      │ • Camera Controls     │
-└─────────────┴─────────────┴─────────────┴────────────────────────┘
+│                        Docker Compose                             │
+├─────────────┬─────────────┬─────────────┬─────────────────────────┤
+│ Profile     │ Profile     │ Game Server │ Game Client             │
+│ Client      │ API         │             │ (React/Three.js)        │
+│ (React)     │ (Express)   │ (Socket.IO) │                         │
+│             │             │             │                         │
+│ Port: 3000  │ Port: 3001  │ Port: 3030  │ Port: 5173              │
+│ ─────────   │ ─────────   │ ─────────   │ ─────────               │
+│ • Login UI  │ • Auth API  │ • Gameplay  │ • Three.js Rendering    │
+│ • Register  │ • Sessions  │ • Combat    │ • Game UI/Tabs          │
+│ • Dashboard │ • SQLite    │ • Parties   │ • Socket.IO Client      │
+│ • Routing   │ • Play Ticket Auth│ • Chat│ • Camera Controls       │
+└─────────────┴─────────────┴─────────────┴─────────────────────────┘
 ```
 
 ### Directory Structure
