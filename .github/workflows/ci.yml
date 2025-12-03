@@ -146,7 +146,7 @@ jobs:
     
     - name: Install dependencies (profile client)
       working-directory: ./client/profile-client
-      run: npm ci
+      run: npm install
     
     - name: Run ESLint (server)
       working-directory: ./server
