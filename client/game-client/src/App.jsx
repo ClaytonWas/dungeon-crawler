@@ -1,36 +1,54 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { useSocket } from './hooks/useSocket'
 import { useGameStore } from './stores/gameStore'
 import GameCanvas from './components/GameCanvas'
 import RightPanel from './components/RightPanel'
 
+const PROFILE_SERVER_URL = import.meta.env.VITE_PROFILE_SERVER_URL || 'http://localhost:3000'
+
 function App() {
-  const [token, setToken] = useState(null)
+  const [playTicket, setPlayTicket] = useState(null)
+  const [loading, setLoading] = useState(true)
   const { connected, panelCollapsed, setPanelCollapsed } = useGameStore()
   
-  useEffect(() => {
-    // Get token from localStorage or URL params
-    const storedToken = localStorage.getItem('token')
-    const urlParams = new URLSearchParams(window.location.search)
-    const urlToken = urlParams.get('token')
-    
-    if (urlToken) {
-      localStorage.setItem('token', urlToken)
-      setToken(urlToken)
-      // Clean URL
-      window.history.replaceState({}, document.title, window.location.pathname)
-    } else if (storedToken) {
-      setToken(storedToken)
-    } else {
-      // Redirect to login
-      window.location.href = '/login'
+  const fetchTokenFromProfile = useCallback(async () => {
+    try {
+      const response = await fetch(`${PROFILE_SERVER_URL}/api/play-ticket`, {
+        method: 'POST',
+        credentials: 'include'
+      })
+      if (!response.ok) {
+        throw new Error('Not authenticated')
+      }
+      const data = await response.json()
+      if (data.ticket) {
+        setPlayTicket(data.ticket)
+        return true
+      }
+      throw new Error('Ticket missing')
+    } catch (error) {
+      console.error('Failed to fetch play ticket:', error)
+      window.location.href = `${PROFILE_SERVER_URL}/login`
+      return false
+    } finally {
+      setLoading(false)
     }
   }, [])
   
-  // Initialize socket connection
-  useSocket(token)
+  const handleTokenInvalid = useCallback(async () => {
+    setLoading(true)
+    setPlayTicket(null)
+    await fetchTokenFromProfile()
+  }, [fetchTokenFromProfile])
   
-  if (!token) {
+  useEffect(() => {
+    fetchTokenFromProfile()
+  }, [fetchTokenFromProfile])
+  
+  // Initialize socket connection
+  useSocket(playTicket, handleTokenInvalid)
+  
+  if (!playTicket || loading) {
     return (
       <div className="min-h-screen flex items-center justify-center">
         <div className="text-xl text-gray-400">Loading...</div>

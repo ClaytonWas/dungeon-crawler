@@ -5,14 +5,14 @@ import toast from 'react-hot-toast'
 
 const GAME_SERVER_URL = import.meta.env.VITE_GAME_SERVER_URL || 'http://localhost:3030'
 
-export function useSocket(token) {
+export function useSocket(ticket, onTicketInvalid) {
   const store = useGameStore()
   
   useEffect(() => {
-    if (!token) return
+    if (!ticket) return
     
     const socket = io(GAME_SERVER_URL, {
-      auth: { token }
+      auth: { ticket }
     })
     
     store.setSocket(socket)
@@ -29,7 +29,12 @@ export function useSocket(token) {
     
     socket.on('connect_error', (err) => {
       console.error('Connection error:', err.message)
-      toast.error('Failed to connect to game server')
+      if (err.message === 'Invalid Ticket' || err.message === 'Authentication Required') {
+        toast.error('Session expired. Refreshing access...')
+        onTicketInvalid?.()
+      } else {
+        toast.error('Failed to connect to game server')
+      }
     })
     
     socket.on('welcome', (message) => {
@@ -312,7 +317,7 @@ export function useSocket(token) {
       store.setSocket(null)
       store.setConnected(false)
     }
-  }, [token])
+  }, [ticket, onTicketInvalid])
   
   // Socket actions
   const emit = useCallback((event, ...args) => {

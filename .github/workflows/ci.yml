@@ -1,0 +1,185 @@
+name: CI/CD Pipeline
+
+on:
+  push:
+    branches: [ main, develop ]
+  pull_request:
+    branches: [ main, develop ]
+
+jobs:
+  # Backend Tests
+  backend-tests:
+    runs-on: ubuntu-latest
+    
+    steps:
+    - uses: actions/checkout@v3
+    
+    - name: Setup Node.js
+      uses: actions/setup-node@v3
+      with:
+        node-version: '20'
+        cache: 'npm'
+        cache-dependency-path: server/package-lock.json
+    
+    - name: Install dependencies
+      working-directory: ./server
+      run: npm ci
+    
+    - name: Run unit tests
+      working-directory: ./server
+      run: npm test -- --coverage
+    
+    - name: Upload coverage
+      uses: codecov/codecov-action@v3
+      with:
+        files: ./server/coverage/coverage-final.json
+        flags: backend
+
+  # Profile API Tests
+  profile-api-tests:
+    runs-on: ubuntu-latest
+    
+    steps:
+    - uses: actions/checkout@v3
+    
+    - name: Setup Node.js
+      uses: actions/setup-node@v3
+      with:
+        node-version: '20'
+        cache: 'npm'
+        cache-dependency-path: client/package-lock.json
+    
+    - name: Install dependencies
+      working-directory: ./client
+      run: npm ci
+    
+    - name: Run API tests
+      working-directory: ./client
+      run: npm test
+    
+    - name: Upload coverage
+      uses: codecov/codecov-action@v3
+      with:
+        files: ./client/coverage/coverage-final.json
+        flags: profile-api
+
+  # Frontend Tests (Game Client)
+  frontend-tests:
+    runs-on: ubuntu-latest
+    
+    steps:
+    - uses: actions/checkout@v3
+    
+    - name: Setup Node.js
+      uses: actions/setup-node@v3
+      with:
+        node-version: '20'
+        cache: 'npm'
+        cache-dependency-path: client/game-client/package-lock.json
+    
+    - name: Install dependencies
+      working-directory: ./client/game-client
+      run: npm ci
+    
+    - name: Run unit tests
+      working-directory: ./client/game-client
+      run: npm test -- --coverage
+    
+    - name: Upload coverage
+      uses: codecov/codecov-action@v3
+      with:
+        files: ./client/game-client/coverage/coverage-final.json
+        flags: frontend
+
+  # E2E Tests
+  e2e-tests:
+    runs-on: ubuntu-latest
+    
+    steps:
+    - uses: actions/checkout@v3
+    
+    - name: Setup Node.js
+      uses: actions/setup-node@v3
+      with:
+        node-version: '20'
+    
+    - name: Install dependencies
+      run: npm ci
+    
+    - name: Install Playwright browsers
+      run: npx playwright install --with-deps
+    
+    - name: Start services
+      run: docker-compose up -d
+    
+    - name: Wait for services
+      run: npx wait-on http://localhost:3000 http://localhost:3030 http://localhost:5173 --timeout 120000
+    
+    - name: Run E2E tests
+      run: npx playwright test
+    
+    - name: Upload Playwright report
+      uses: actions/upload-artifact@v3
+      if: always()
+      with:
+        name: playwright-report
+        path: playwright-report/
+        retention-days: 30
+    
+    - name: Stop services
+      if: always()
+      run: docker-compose down
+
+  # Lint & Type Check
+  lint:
+    runs-on: ubuntu-latest
+    
+    steps:
+    - uses: actions/checkout@v3
+    
+    - name: Setup Node.js
+      uses: actions/setup-node@v3
+      with:
+        node-version: '20'
+    
+    - name: Install dependencies (server)
+      working-directory: ./server
+      run: npm ci
+    
+    - name: Install dependencies (game client)
+      working-directory: ./client/game-client
+      run: npm ci
+    
+    - name: Install dependencies (profile client)
+      working-directory: ./client/profile-client
+      run: npm ci
+    
+    - name: Run ESLint (server)
+      working-directory: ./server
+      run: npm run lint || echo "Lint not configured yet"
+    
+    - name: Run ESLint (game client)
+      working-directory: ./client/game-client
+      run: npm run lint || echo "Lint not configured yet"
+    
+    - name: Run ESLint (profile client)
+      working-directory: ./client/profile-client
+      run: npm run lint || echo "Lint not configured yet"
+
+  # Docker Build Test
+  docker-build:
+    runs-on: ubuntu-latest
+    
+    steps:
+    - uses: actions/checkout@v3
+    
+    - name: Build Docker images
+      run: docker-compose build
+    
+    - name: Test Docker containers
+      run: |
+        docker-compose up -d
+        sleep 30
+        docker-compose ps
+        docker-compose down
+

@@ -41,7 +41,7 @@ This document provides a comprehensive overview of the Dungeon Crawler MMO archi
 │  │ • RESTful API     │         │  • WebSocket Server      │   │
 │  │ • Sessions        │         │  • Real-time State       │   │
 │  │ • Auth (bcrypt)   │         │  • Combat System         │   │
-│  │ • JWT Tokens      │         │  • Party Management      │   │
+│  │ • Play Tickets    │         │  • Party Management      │   │
 │  │ • SQLite DB       │         │  • Character Manager     │   │
 │  │ • CORS Config     │         │  • Weapon System         │   │
 │  └───────────────────┘         │  • Scene API             │   │
@@ -87,15 +87,15 @@ window.location.href = 'http://localhost:5173'
     ↓
 Game Client Loads (React)
     ↓
-GET /api/token (with session cookie)
+POST /api/play-ticket (with session cookie)
     ↓
-Profile API generates JWT
+Profile API generates short-lived ticket
     ↓
-Game Client receives JWT
+Game Client receives ticket
     ↓
-Socket.IO connect with JWT
+Socket.IO handshake sends ticket
     ↓
-Game Server validates JWT
+Game Server validates ticket with Profile API
     ↓
 Emit 'authenticated' event
     ↓
@@ -232,7 +232,7 @@ Render
   - Sync Socket.IO state to Three.js
 
 #### **useSocket.js**
-- Socket.IO connection with JWT authentication
+- Socket.IO connection with play-ticket authentication + auto refresh
 - Event listeners for game state
 - Updates Zustand store
 - Handles disconnections/reconnections
@@ -269,7 +269,8 @@ Render
 | POST | `/api/login` | Login | ❌ |
 | POST | `/api/register` | Register | ❌ |
 | POST | `/api/logout` | Logout | ✅ |
-| GET | `/api/token` | Get JWT for game server | ✅ |
+| POST | `/api/play-ticket` | Issue short-lived game ticket | ✅ |
+| POST | `/api/play-ticket/validate` | Validate ticket (game server) | Internal |
 | GET | `/api/health` | Health check | ❌ |
 
 ---
@@ -498,7 +499,7 @@ Render
 
 | Event | Data | Description |
 |-------|------|-------------|
-| `authenticate` | `{ token }` | Authenticate with JWT |
+| `[handshake auth]` | `{ ticket }` | Socket.IO connection includes play ticket |
 | `updatePlayerPosition` | `{ x, z }` | Move player |
 | `getWeaponStats` | - | Request weapon stats |
 | `upgradeWeapon` | `{ upgradeType, amount }` | Upgrade weapon |
@@ -610,7 +611,7 @@ Render
 ## 🔐 Security
 
 ### Current Measures
-- ✅ JWT authentication
+- ✅ Play-ticket authentication
 - ✅ bcrypt password hashing (cost 10)
 - ✅ httpOnly session cookies
 - ✅ Socket.IO middleware validation

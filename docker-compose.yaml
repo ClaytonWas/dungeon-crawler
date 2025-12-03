@@ -10,6 +10,7 @@ services:
       - PORT=3030
       - GAME_SERVER_PORT=3030
       - PROFILE_SERVER_URL=${PROFILE_SERVER_URL:-http://localhost:3000}
+      - PROFILE_API_URL=${PROFILE_API_URL:-http://profile-api:3001}
       - SECRET_KEY=${SECRET_KEY:-dungeoncrawler}
       - JWT_SECRET=${JWT_SECRET:-${SECRET_KEY:-dungeoncrawler}}
     restart: unless-stopped

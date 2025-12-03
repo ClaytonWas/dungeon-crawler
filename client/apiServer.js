@@ -3,33 +3,33 @@ const session = require('express-session')
 const sqlite3 = require('sqlite3').verbose()
 const bcrypt = require('bcrypt')
 const path = require('path')
-const jsonWebToken = require('jsonwebtoken')
 const fs = require('fs')
 const cors = require('cors')
+const crypto = require('crypto')
 
 const app = express()
 const port = process.env.PORT || 3001
 const secretKey = process.env.SECRET_KEY || process.env.JWT_SECRET || 'dungeoncrawler'
 
-const activeSessions = new Map()
+const playTickets = new Map()
+const PLAY_TICKET_TTL = 30 * 1000
 
 // Session cleanup interval
-const sessionCleanupInterval = setInterval(() => {
-    const now = Math.floor(Date.now() / 1000)
-    for (const [userId, sessionInfo] of activeSessions.entries()) {
-        try {
-            const decoded = jsonWebToken.decode(sessionInfo.token)
-            if (!decoded || !decoded.exp || decoded.exp < now) {
-                activeSessions.delete(userId)
-            }
-        } catch (error) {
-            activeSessions.delete(userId)
+const cleanupPlayTickets = () => {
+    const now = Date.now()
+    for (const [ticket, info] of playTickets.entries()) {
+        if (!info || info.expiresAt <= now) {
+            playTickets.delete(ticket)
         }
     }
+}
+
+const sessionCleanupInterval = setInterval(() => {
+    cleanupPlayTickets()
 }, 5 * 60 * 1000)
 
 // Database setup
-const dbPath = path.join(__dirname, './db/accounts.db')
+const dbPath = process.env.DB_PATH || path.join(__dirname, './db/accounts.db')
 const dbDir = path.dirname(dbPath)
 
 if (!fs.existsSync(dbDir)) {
@@ -213,30 +213,45 @@ app.post('/api/logout', (req, res) => {
     })
 })
 
-// Get JWT token for game server
-app.get('/api/token', (req, res) => {
+// Issue a short-lived play ticket for the game server
+app.post('/api/play-ticket', (req, res) => {
     if (!req.session.user) {
         return res.status(401).json({ message: 'Not authenticated' })
     }
 
-    const token = jsonWebToken.sign(
-        {
+    const ticket = crypto.randomUUID()
+    playTickets.set(ticket, {
+        user: {
             id: req.session.user.id,
             username: req.session.user.username,
             shape: req.session.user.shape,
             color: req.session.user.color
         },
-        secretKey,
-        { expiresIn: '3h' }
-    )
-
-    activeSessions.set(req.session.user.id, {
-        token: token,
-        sessionId: req.sessionID,
-        loginTime: Date.now()
+        expiresAt: Date.now() + PLAY_TICKET_TTL
     })
 
-    res.json({ token })
+    res.json({ ticket, expiresIn: PLAY_TICKET_TTL })
+})
+
+// Validate play ticket (used by game server)
+app.post('/api/play-ticket/validate', (req, res) => {
+    const { ticket } = req.body || {}
+    if (!ticket) {
+        return res.status(400).json({ message: 'Ticket required' })
+    }
+
+    const record = playTickets.get(ticket)
+    if (!record) {
+        return res.status(401).json({ message: 'Invalid ticket' })
+    }
+
+    if (record.expiresAt <= Date.now()) {
+        playTickets.delete(ticket)
+        return res.status(401).json({ message: 'Ticket expired' })
+    }
+
+    playTickets.delete(ticket)
+    res.json({ valid: true, user: record.user })
 })
 
 // Health check
@@ -244,14 +259,21 @@ app.get('/api/health', (req, res) => {
     res.json({ status: 'ok', service: 'profile-api' })
 })
 
-// Start server
-app.listen(port, '0.0.0.0', () => {
-    console.log(`[Profile API] Server running on http://localhost:${port}`)
-})
+// Start server (skip in test mode)
+if (process.env.NODE_ENV !== 'test') {
+    app.listen(port, '0.0.0.0', () => {
+        console.log(`[Profile API] Server running on http://localhost:${port}`)
+    })
+}
 
 // Cleanup on exit
 process.on('SIGTERM', () => {
     clearInterval(sessionCleanupInterval)
     db.close()
 })
+
+// Export for testing
+module.exports = app
+module.exports.sessionCleanupInterval = sessionCleanupInterval
+module.exports.db = db
 

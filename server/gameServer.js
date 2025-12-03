@@ -2,7 +2,7 @@ const express = require('express')
 const http = require('http')
 const { Server } = require('socket.io')
 const cors = require('cors')
-const jsonWebToken = require('jsonwebtoken')
+const fetch = require('node-fetch')
 const path = require('path')
 const fs = require('fs')
 
@@ -11,12 +11,13 @@ const weaponSystem = require('./systems/weaponSystem')
 const characterUpgrades = require('./systems/characterUpgrades')
 const accountUpgrades = require('./systems/accountUpgrades')
 const characterManager = require('./systems/characterManager')
+const combatSystem = require('./systems/combatSystem')
 
 // Config
 const SHIP = {
     PORT: process.env.PORT || process.env.GAME_SERVER_PORT || 3030,
-    SECRET_KEY: process.env.SECRET_KEY || process.env.JWT_SECRET || 'dungeoncrawler',
     PROFILE_SERVER: process.env.PROFILE_SERVER_URL || 'http://localhost:3000',
+    PROFILE_API: process.env.PROFILE_API_URL || 'http://profile-api:3001',
     MAX_PARTY_SIZE: 4,
     TICK_RATE: 60 // Server tick rate (updates per second)
 }
@@ -132,22 +133,40 @@ app.get('/textures', (req, res) => {
     })
 })
 
-// Authenticating Users
-io.use((socket, next) => {
-    let token = socket.handshake.auth.token
-    if (!token) {
-        return next(new Error('Authentication Required'))
-    }
-    jsonWebToken.verify(token, SHIP.SECRET_KEY, (error, userData) => {
-        if (error) {
-            return next(new Error('Invalid Token'))
+// Authenticating Users via play tickets
+io.use(async (socket, next) => {
+    try {
+        const ticket = socket.handshake.auth?.ticket
+        if (!ticket) {
+            return next(new Error('Authentication Required'))
         }
-        if(!userData || !userData.id || !userData.username) {
+
+        const response = await fetch(`${SHIP.PROFILE_API}/api/play-ticket/validate`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({ ticket })
+        })
+
+        if (!response.ok) {
+            if (response.status === 401) {
+                return next(new Error('Invalid Ticket'))
+            }
+            return next(new Error('Authentication Service Unavailable'))
+        }
+
+        const data = await response.json()
+        if (!data || !data.user || !data.user.id || !data.user.username) {
             return next(new Error('Invalid User'))
         }
-        socket.user = userData
+
+        socket.user = data.user
         next()
-    })
+    } catch (error) {
+        console.error('[Auth] Ticket validation failed:', error)
+        next(new Error('Authentication Service Unavailable'))
+    }
 })
 
 // Party Management
@@ -326,288 +345,7 @@ const partyManager = {
 
 // Weapon System is now imported from ./systems/weaponSystem.js
 
-// Combat System - Vampire Survivors style auto-attack
-const combatSystem = {
-    // Auto-attack enemies in radius (called periodically)
-    autoAttack: (socket) => {
-        const roomId = playerToRoom.get(socket)
-        if (!roomId) return
-        
-        const room = dungeonRooms.get(roomId)
-        if (!room) return
-        
-        const player = playersInServer.get(socket.user.id)
-        if (!player) return
-        
-        const weaponStats = weaponSystem.getWeaponStats(player)
-        if (!weaponStats) return
-        
-        const now = Date.now()
-        
-        // Check attack cooldown
-        if (now - weaponStats.lastAttackTime < weaponStats.attackCooldown) {
-            return
-        }
-        
-        // Find enemies in range (already limited by maxTargets)
-        const enemiesInRange = weaponSystem.findEnemiesInRadius(player, room)
-        if (enemiesInRange.length === 0) {
-            return
-        }
-        
-        // Attack enemies in range (limited by maxTargets/piercing)
-        const attackedEnemies = []
-        enemiesInRange.forEach(({ enemy }) => {
-            const damage = weaponSystem.calculateDamage(weaponStats)
-            enemy.health -= damage
-            
-            attackedEnemies.push({
-                enemyId: enemy.id,
-                damage: damage,
-                health: enemy.health,
-                maxHealth: enemy.maxHealth
-            })
-            
-            // Check if enemy is dead
-            if (enemy.health <= 0) {
-                enemy.health = 0
-                room.enemies = room.enemies.filter(e => e.id !== enemy.id)
-                
-                // Spawn loot
-                const loot = {
-                    id: `loot_${Date.now()}_${Math.random()}`,
-                    type: 'gold',
-                    amount: Math.floor(Math.random() * 20) + 10,
-                    position: enemy.position
-                }
-                room.loot.push(loot)
-                
-                // Give experience to player who killed the enemy
-                const player = playersInServer.get(socket.user.id)
-                if (player && player.characterId) {
-                    const expGain = 10 + Math.floor(Math.random() * 10) // 10-20 exp per kill
-                    
-                    // Add to in-match experience (for display)
-                    const levelUpResult = characterUpgrades.addExperience(player, expGain)
-                    if (levelUpResult.leveledUp) {
-                        socket.emit('levelUp', { newLevel: levelUpResult.newLevel })
-                    }
-                    
-                    // Also save to persistent character
-                    const charResult = characterManager.addExperience(socket.user.id, player.characterId, expGain)
-                    if (charResult.leveledUp) {
-                        // Update player's max health/mana if leveled up
-                        player.maxHealth = charResult.character.baseMaxHealth
-                        player.health = Math.min(player.health, player.maxHealth)
-                        player.maxMana = charResult.character.baseMaxMana
-                        player.mana = Math.min(player.mana, player.maxMana)
-                        player.defense = charResult.character.baseDefense
-                    }
-                    
-                    // Update kill count
-                    characterManager.updateCharacter(socket.user.id, player.characterId, {
-                        totalKills: (charResult.character.totalKills || 0) + 1
-                    })
-                }
-                
-                // Broadcast enemy death
-                const party = parties.get(room.partyId)
-                if (party) {
-                    party.members.forEach(member => {
-                        member.emit('enemyKilled', {
-                            enemyId: enemy.id,
-                            loot: loot
-                        })
-                    })
-                }
-            }
-        })
-        
-        // Update last attack time
-        player.lastAttackTime = now
-        
-        // Broadcast attacks to party
-        const party = parties.get(room.partyId)
-        if (party && attackedEnemies.length > 0) {
-            // Get list of targeted enemy IDs for visual indicators
-            const targetedEnemyIds = enemiesInRange.map(({ enemy }) => enemy.id)
-            
-            party.members.forEach(member => {
-                member.emit('enemyDamaged', {
-                    attacks: attackedEnemies,
-                    playerId: socket.user.id
-                })
-                
-                // Emit targeted enemies for this player (for bounding box display)
-                if (member === socket) {
-                    member.emit('enemiesTargeted', {
-                        enemyIds: targetedEnemyIds,
-                        attackRadius: weaponStats.attackRadius
-                    })
-                }
-            })
-        }
-        
-        // Check if room is cleared
-        if (room.enemies.length === 0 && !room.cleared) {
-            room.cleared = true
-            if (party) {
-                // Notify party that room is cleared
-                party.members.forEach(member => {
-                    member.emit('roomCleared', { roomId: roomId })
-                })
-                
-                // Return all party members to hub world
-                party.members.forEach(member => {
-                    // Remove from dungeon
-                    playerToRoom.delete(member)
-                    
-                    // Add back to hub
-                    hubWorldPlayers.add(member)
-                    
-                    // Reset player position
-                    const player = playersInServer.get(member.user.id)
-                    if (player) {
-                        player.position = { x: 0, y: 0.5, z: 0 }
-                    }
-                    
-                    // Tell this player they returned to hub
-                    member.emit('returnToHubWorld', { cleared: true })
-                    
-                    // Send this player the current hub state
-                    playerMonitor.sendAreaState(member)
-                    
-                    // BROADCAST: Tell all OTHER hub players about this player returning
-                    const playerData = playerMonitor.getPlayerData(member)
-                    if (playerData) {
-                        hubWorldPlayers.forEach(hubSocket => {
-                            if (hubSocket !== member) {
-                                hubSocket.emit('playerJoined', playerData)
-                            }
-                        })
-                    }
-                })
-                
-                // Clean up dungeon room
-                dungeonRooms.delete(roomId)
-                party.roomId = null
-                
-                console.log(`[DUNGEON] Room ${roomId} cleared, party returned to hub`)
-            }
-        }
-    },
-    
-    // Legacy attack function (kept for compatibility, but auto-attack is primary)
-    attackEnemy: (socket, enemyId) => {
-        const roomId = playerToRoom.get(socket)
-        if (!roomId) return { success: false, message: 'Not in a dungeon room' }
-        
-        const room = dungeonRooms.get(roomId)
-        if (!room) return { success: false, message: 'Room not found' }
-        
-        const enemy = room.enemies.find(e => e.id === enemyId)
-        if (!enemy) return { success: false, message: 'Enemy not found' }
-        
-        const weaponStats = weaponSystem.getWeaponStats(socket)
-        if (!weaponStats) return { success: false, message: 'Weapon stats not found' }
-        
-        const damage = weaponSystem.calculateDamage(weaponStats)
-        enemy.health -= damage
-        
-        // Broadcast damage to all party members
-        const party = parties.get(room.partyId)
-        if (party) {
-            party.members.forEach(member => {
-                member.emit('enemyDamaged', {
-                    attacks: [{
-                        enemyId: enemyId,
-                        damage: damage,
-                        health: enemy.health,
-                        maxHealth: enemy.maxHealth
-                    }],
-                    playerId: socket.user.id
-                })
-            })
-        }
-        
-        // Check if enemy is dead
-        if (enemy.health <= 0) {
-            enemy.health = 0
-            room.enemies = room.enemies.filter(e => e.id !== enemyId)
-            
-            // Spawn loot
-            const loot = {
-                id: `loot_${Date.now()}`,
-                type: 'gold',
-                amount: Math.floor(Math.random() * 20) + 10,
-                position: enemy.position
-            }
-            room.loot.push(loot)
-            
-            // Give experience to player who killed the enemy (if available)
-            const attackingPlayer = playersInServer.get(socket?.user?.id)
-            if (attackingPlayer) {
-                const expGain = 10 + Math.floor(Math.random() * 10) // 10-20 exp per kill
-                const levelUpResult = characterUpgrades.addExperience(attackingPlayer, expGain)
-                if (levelUpResult.leveledUp && socket) {
-                    socket.emit('levelUp', { newLevel: levelUpResult.newLevel })
-                }
-            }
-            
-            // Broadcast enemy death
-            if (party) {
-                party.members.forEach(member => {
-                    member.emit('enemyKilled', {
-                        enemyId: enemyId,
-                        loot: loot
-                    })
-                })
-            }
-            
-            // Check if room is cleared
-            if (room.enemies.length === 0) {
-                room.cleared = true
-                if (party) {
-                    party.members.forEach(member => {
-                        member.emit('roomCleared', { roomId: roomId })
-                    })
-                }
-            }
-        }
-        
-        return { success: true, damage: damage }
-    },
-
-    enemyAttackPlayer: (enemy, targetSocket) => {
-        const player = playersInServer.get(targetSocket.user.id)
-        if (!player) return
-        
-        const damage = 5 + Math.floor(Math.random() * 5)
-        player.health = Math.max(0, (player.health || 100) - damage)
-        
-        // Broadcast damage
-        const partyId = playerToParty.get(targetSocket)
-        if (partyId) {
-            const party = parties.get(partyId)
-            if (party) {
-                party.members.forEach(member => {
-                    member.emit('playerDamaged', {
-                        playerId: targetSocket.user.id,
-                        damage: damage,
-                        health: player.health,
-                        maxHealth: player.maxHealth || 100
-                    })
-                })
-            }
-        }
-        
-        // Check if player is dead
-        if (player.health <= 0) {
-            player.health = 0
-            targetSocket.emit('playerDied')
-        }
-    }
-}
+// Combat logic is implemented in server/systems/combatSystem.js
 
 // Enemy AI - runs on server tick
 const enemyAI = {
@@ -893,6 +631,20 @@ const playerMonitor = {
     }
 }
 
+// Inject dependencies into combat system module
+combatSystem.configure({
+    playersInServer,
+    playerToRoom,
+    playerToParty,
+    dungeonRooms,
+    parties,
+    weaponSystem,
+    characterUpgrades,
+    characterManager,
+    hubWorldPlayers,
+    playerMonitor
+})
+
 // Socket.IO connection handling
 io.on('connection', async (socket) => {
     const username = socket.user.username
@@ -1042,10 +794,36 @@ io.on('connection', async (socket) => {
             player.characterId = characterId
             player.shape = character.shape
             player.color = character.color
+            player.weaponType = character.weaponType || player.weaponType || 'basic'
             player.level = character.level
+            player.experience = character.experience
+            player.experienceToNextLevel = character.experienceToNextLevel
+            player.maxHealth = character.baseMaxHealth
+            player.health = character.baseMaxHealth
+            player.maxMana = character.baseMaxMana
+            player.mana = character.baseMaxMana
+            player.movementSpeed = character.baseMovementSpeed
+            player.damageMultiplier = character.baseDamageMultiplier
+            player.defense = character.baseDefense
+            player.lastAttackTime = 0
+
+            characterUpgrades.initializeStats(player)
+
+            try {
+                const accountUpgradesData = await accountUpgrades.getAccountUpgrades(socket.user.id)
+                accountUpgrades.applyAccountUpgrades(player, accountUpgradesData)
+            } catch (err) {
+                console.error('Error applying account upgrades on character switch:', err)
+            }
             
             // BROADCAST: Tell all players in area about the appearance change
             playerMonitor.updatePlayerAppearance(socket)
+
+            const charStats = characterUpgrades.getCharacterStats(player)
+            socket.emit('characterStats', charStats)
+
+            const weaponStats = weaponSystem.getWeaponStatsForDisplay(player)
+            socket.emit('weaponStats', weaponStats)
         }
         
         // Refresh character list for this player

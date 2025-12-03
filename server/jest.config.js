@@ -1,12 +1,21 @@
 module.exports = {
   testEnvironment: 'node',
-  testMatch: ['**/__tests__/**/*.test.js', '**/?(*.)+(spec|test).js'],
-  collectCoverageFrom: [
-    'gameServer.js',
-    '!**/node_modules/**',
-    '!**/__tests__/**'
-  ],
   coverageDirectory: 'coverage',
-  verbose: true
+  collectCoverageFrom: [
+    'systems/**/*.js',
+    '!systems/**/*.test.js',
+    '!systems/__tests__/**'
+  ],
+  testMatch: [
+    '**/__tests__/**/*.js',
+    '**/*.test.js'
+  ],
+  coverageThreshold: {
+    global: {
+      branches: 50,
+      functions: 50,
+      lines: 50,
+      statements: 50
+    }
+  }
 }
-

@@ -35,6 +35,30 @@ export default function AccountTab() {
       socket?.emit('deleteCharacter', charId)
     }
   }
+
+  const handleLogout = async () => {
+    try {
+      const response = await fetch(`${PROFILE_SERVER_URL}/api/logout`, {
+        method: 'POST',
+        credentials: 'include'
+      })
+
+      if (!response.ok) {
+        throw new Error('Logout failed')
+      }
+
+      // Clear any locally stored state
+      localStorage.removeItem('selectedCharacterId')
+
+      // Disconnect socket to prevent ghost sessions
+      socket?.disconnect()
+
+      window.location.href = `${PROFILE_SERVER_URL}/login`
+    } catch (error) {
+      console.error('Logout error:', error)
+      toast.error('Failed to log out. Please try again.')
+    }
+  }
   
   const createCharacter = (e) => {
     e.preventDefault()
@@ -148,12 +172,12 @@ export default function AccountTab() {
           >
             🏠 Main Menu
           </a>
-          <a
-            href={`${PROFILE_SERVER_URL}/logout`}
-            className="block w-full text-center btn-secondary"
+          <button
+            onClick={handleLogout}
+            className="w-full text-center btn-secondary"
           >
             🚪 Logout
-          </a>
+          </button>
         </div>
       </div>
     </div>

@@ -34,7 +34,7 @@ A real-time multiplayer dungeon crawler with **Vampire Survivors-style combat**,
 - 🔄 **Real-time State Sync** - MMO-style concurrent state updates
 - 🎨 **Modern UI** - React + Tailwind CSS with dark gothic aesthetic
 - 🎮 **3D Graphics** - Three.js rendering with camera controls
-- 🔐 **JWT Authentication** - Secure session management
+- 🔐 **Play Ticket Authentication** - Session-backed, short-lived tickets validated server-to-server
 - 🐳 **Docker Deployment** - Multi-service containerized architecture
 - 📊 **Performance Monitoring** - FPS counter, connection status
 
@@ -56,7 +56,7 @@ A real-time multiplayer dungeon crawler with **Vampire Survivors-style combat**,
 │ • Login UI  │ • Auth API  │ • Gameplay  │ • Three.js Rendering  │
 │ • Register  │ • Sessions  │ • Combat    │ • Game UI/Tabs        │
 │ • Dashboard │ • SQLite    │ • Parties   │ • Socket.IO Client    │
-│ • Routing   │ • JWT       │ • Chat      │ • Camera Controls     │
+│ • Routing   │ • Play Ticket Auth│ • Chat      │ • Camera Controls     │
 └─────────────┴─────────────┴─────────────┴────────────────────────┘
 ```
 
@@ -185,6 +185,9 @@ npm run dev
 #### **Scene JSON Reference**
 → Read **[SCENE_QUICK_START.md](SCENE_QUICK_START.md)** - Technical scene schema documentation
 
+#### **Testing & CI/CD**
+→ Read **[TESTING_GUIDE.md](TESTING_GUIDE.md)** - Unit tests, integration tests, E2E tests, and automation
+
 
 ## 📚 Full Documentation Index
 
@@ -197,8 +200,9 @@ npm run dev
 | **[WEAPON_GUIDE.md](WEAPON_GUIDE.md)** | Create & balance weapons | Game Designers | 400+ |
 | **[CHARACTER_GUIDE.md](CHARACTER_GUIDE.md)** | Character systems & progression | Game Designers | 450+ |
 | **[SCENE_QUICK_START.md](SCENE_QUICK_START.md)** | Scene JSON schema reference | Technical | 390+ |
+| **[TESTING_GUIDE.md](TESTING_GUIDE.md)** | Testing & CI/CD automation | Developers/QA | 900+ |
 
-**Total Documentation**: ~3,800+ lines
+**Total Documentation**: ~4,700+ lines
 
 
 ## 🎓 Learning Paths
