@@ -2,10 +2,6 @@
 
 A real-time multiplayer dungeon crawler with **Vampire Survivors-style combat**, built with Node.js, Socket.IO, Three.js, and React.
 
-![Status](https://img.shields.io/badge/status-MVP-blue) ![License](https://img.shields.io/badge/license-MIT-green)
-
----
-
 ## 📋 Table of Contents
 
 - [Features](#features)
@@ -16,7 +12,6 @@ A real-time multiplayer dungeon crawler with **Vampire Survivors-style combat**,
 - [Development Roadmap](#development-roadmap)
 - [Contributing](#contributing)
 
----
 
 ## ✨ Features
 
@@ -43,7 +38,6 @@ A real-time multiplayer dungeon crawler with **Vampire Survivors-style combat**,
 - 🐳 **Docker Deployment** - Multi-service containerized architecture
 - 📊 **Performance Monitoring** - FPS counter, connection status
 
----
 
 ## 🏗️ Architecture
 
@@ -119,7 +113,6 @@ dungeon-crawler/
     └── SCENE_QUICK_START.md        # Scene schema reference
 ```
 
----
 
 ## 🚀 Quick Start
 
@@ -169,7 +162,6 @@ npm run dev
 3. Choose your character shape and color
 4. Click "Enter Dungeon" to join the game
 
----
 
 ## 📖 Documentation Quick Start
 
@@ -193,7 +185,6 @@ npm run dev
 #### **Scene JSON Reference**
 → Read **[SCENE_QUICK_START.md](SCENE_QUICK_START.md)** - Technical scene schema documentation
 
----
 
 ## 📚 Full Documentation Index
 
@@ -209,7 +200,6 @@ npm run dev
 
 **Total Documentation**: ~3,800+ lines
 
----
 
 ## 🎓 Learning Paths
 
@@ -237,7 +227,6 @@ npm run dev
 
 **Time to Productivity**: 1-2 hours
 
----
 
 ## 🚀 Quick Examples
 
@@ -288,7 +277,6 @@ socket.emit('createCharacter', {
 
 See **[CHARACTER_GUIDE.md](CHARACTER_GUIDE.md)** for complete details.
 
----
 
 ## ⚡ Key Systems Overview
 
@@ -325,8 +313,6 @@ See **[CHARACTER_GUIDE.md](CHARACTER_GUIDE.md)** for complete details.
 - **Party chat** for coordination  
 → **[Architecture Guide](ARCHITECTURE.md)**
 
----
-
 
 ## 🗺️ Development Roadmap
 
@@ -338,7 +324,7 @@ See **[CHARACTER_GUIDE.md](CHARACTER_GUIDE.md)** for complete details.
 - [x] Hub world + dungeons
 - [x] React client with Three.js
 
-### Phase 2: Polish & QoL (1-2 weeks)
+### Phase 2: Polish & QoL
 - [ ] Jump & gravity mechanics
 - [ ] More weapon types (5-10 total)
 - [ ] Enemy variety (3-5 types)
@@ -346,7 +332,7 @@ See **[CHARACTER_GUIDE.md](CHARACTER_GUIDE.md)** for complete details.
 - [ ] Sound effects & music
 - [ ] Mini-map
 
-### Phase 3: Production Ready (2-3 weeks)
+### Phase 3: Production Ready 
 - [ ] PostgreSQL/MongoDB migration
 - [ ] Input validation (Zod schemas)
 - [ ] Anti-cheat measures
@@ -354,7 +340,7 @@ See **[CHARACTER_GUIDE.md](CHARACTER_GUIDE.md)** for complete details.
 - [ ] Error handling & logging
 - [ ] Unit tests
 
-### Phase 4: Scalability (2-3 weeks)
+### Phase 4: Scalability 
 - [ ] Redis for shared state
 - [ ] Server sharding
 - [ ] Spatial partitioning
@@ -369,8 +355,6 @@ See **[CHARACTER_GUIDE.md](CHARACTER_GUIDE.md)** for complete details.
 - [ ] Guilds
 - [ ] Trading
 - [ ] PvP arena
-
----
 
 ## 🤝 Contributing
 
@@ -388,27 +372,3 @@ We welcome contributions! Please read our **[Contributing Guide](CONTRIBUTING.md
 4. Create a feature branch
 5. Submit a pull request
 
----
-
-## 📝 License
-
-MIT License - See LICENSE file for details
-
----
-
-## 🙏 Credits
-
-- **Three.js** - 3D graphics
-- **Socket.IO** - Real-time networking
-- **React** - UI framework
-- **Tailwind CSS** - Styling
-
----
-
-## 📧 Support
-
-For questions or issues, please open a GitHub issue.
-
----
-
-**Built with ❤️ for the MMO gaming community**
