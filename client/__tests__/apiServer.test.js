@@ -40,10 +40,13 @@ describe('Profile API Server', () => {
   })
 
   afterAll((done) => {
-    // Clear session cleanup interval
+    // Clear session cleanup intervals
     const apiServer = require('../apiServer')
     if (apiServer.sessionCleanupInterval) {
       clearInterval(apiServer.sessionCleanupInterval)
+    }
+    if (apiServer.sessionDbCleanupInterval) {
+      clearInterval(apiServer.sessionDbCleanupInterval)
     }
 
     // Close both databases
@@ -172,9 +175,12 @@ describe('Profile API Server', () => {
   })
 
   describe('POST /api/login', () => {
+    let loginAgent
+
     beforeAll(async () => {
       // Create a test user for login tests
-      await request(app)
+      loginAgent = request.agent(app)
+      await loginAgent
         .post('/api/register')
         .send({
           username: 'logintest',
@@ -182,6 +188,8 @@ describe('Profile API Server', () => {
           shape: 'sphere',
           color: '#0000ff'
         })
+      // Logout so we can test login
+      await loginAgent.post('/api/logout')
     })
 
     it('should login with valid credentials', async () => {
@@ -249,6 +257,23 @@ describe('Profile API Server', () => {
   })
 
   describe('GET /api/me', () => {
+    let meAgent
+
+    beforeAll(async () => {
+      // Create a dedicated user for /api/me tests
+      meAgent = request.agent(app)
+      await meAgent
+        .post('/api/register')
+        .send({
+          username: 'meuser',
+          password: 'testpass123',
+          shape: 'sphere',
+          color: '#0000ff'
+        })
+      // Logout so we can test login
+      await meAgent.post('/api/logout')
+    })
+
     it('should return user data when authenticated', async () => {
       // Create an agent to persist cookies
       const agent = request.agent(app)
@@ -257,7 +282,7 @@ describe('Profile API Server', () => {
       await agent
         .post('/api/login')
         .send({
-          username: 'logintest',
+          username: 'meuser',
           password: 'testpass123'
         })
         .expect(200)
@@ -268,9 +293,12 @@ describe('Profile API Server', () => {
         .expect(200)
 
       expect(response.body).toHaveProperty('id')
-      expect(response.body).toHaveProperty('username', 'logintest')
+      expect(response.body).toHaveProperty('username', 'meuser')
       expect(response.body).toHaveProperty('shape', 'sphere')
       expect(response.body).toHaveProperty('color', '#0000ff')
+
+      // Logout to clean up session
+      await agent.post('/api/logout')
     })
 
     it('should return 401 when not authenticated', async () => {
@@ -283,6 +311,23 @@ describe('Profile API Server', () => {
   })
 
   describe('POST /api/logout', () => {
+    let logoutAgent
+
+    beforeAll(async () => {
+      // Create a dedicated user for logout tests
+      logoutAgent = request.agent(app)
+      await logoutAgent
+        .post('/api/register')
+        .send({
+          username: 'logoutuser',
+          password: 'testpass123',
+          shape: 'sphere',
+          color: '#0000ff'
+        })
+      // Logout so we can test login
+      await logoutAgent.post('/api/logout')
+    })
+
     it('should logout authenticated user', async () => {
       const agent = request.agent(app)
 
@@ -290,7 +335,7 @@ describe('Profile API Server', () => {
       await agent
         .post('/api/login')
         .send({
-          username: 'logintest',
+          username: 'logoutuser',
           password: 'testpass123'
         })
         .expect(200)
@@ -321,14 +366,21 @@ describe('Profile API Server', () => {
     let agent
 
     beforeAll(async () => {
+      // Create a dedicated user for play ticket tests
       agent = request.agent(app)
       await agent
-        .post('/api/login')
+        .post('/api/register')
         .send({
-          username: 'logintest',
-          password: 'testpass123'
+          username: 'ticketuser',
+          password: 'testpass123',
+          shape: 'cube',
+          color: '#00ff00'
         })
-        .expect(200)
+      // Registration auto-logs in, so we're good
+    })
+
+    afterAll(async () => {
+      await agent.post('/api/logout')
     })
 
     it('should issue a play ticket for authenticated user', async () => {
@@ -362,7 +414,7 @@ describe('Profile API Server', () => {
 
       expect(validation.body).toHaveProperty('valid', true)
       expect(validation.body).toHaveProperty('user')
-      expect(validation.body.user).toHaveProperty('username', 'logintest')
+      expect(validation.body.user).toHaveProperty('username', 'ticketuser')
       expect(validation.body.user).toHaveProperty('shape')
       expect(validation.body.user).toHaveProperty('color')
     })
@@ -431,17 +483,18 @@ describe('Profile API Server', () => {
     })
 
     it('should clear session on logout', async () => {
+      // Create a dedicated user for this test
       const agent = request.agent(app)
-
-      // Login
       await agent
-        .post('/api/login')
+        .post('/api/register')
         .send({
-          username: 'logintest',
-          password: 'testpass123'
+          username: 'clearsessionuser',
+          password: 'testpass123',
+          shape: 'cube',
+          color: '#00ff00'
         })
 
-      // Verify logged in
+      // Verify logged in (registration auto-logs in)
       await agent.get('/api/me').expect(200)
 
       // Logout
@@ -480,14 +533,18 @@ describe('Profile API Server', () => {
       const username = 'bcrypttest'
       const password = 'testpass456'
 
-      // Register
-      await request(app)
+      // Register with an agent so we can logout
+      const agent = request.agent(app)
+      await agent
         .post('/api/register')
         .send({
           username: username,
           password: password
         })
         .expect(201)
+
+      // Logout to test login separately
+      await agent.post('/api/logout')
 
       // Login with correct password
       await request(app)
@@ -497,6 +554,9 @@ describe('Profile API Server', () => {
           password: password
         })
         .expect(200)
+
+      // Logout again to test wrong password
+      await agent.post('/api/logout')
 
       // Login with wrong password
       await request(app)

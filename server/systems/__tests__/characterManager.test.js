@@ -1,550 +1,274 @@
+// Mock node-fetch before requiring characterManager
+jest.mock('node-fetch')
+const fetch = require('node-fetch')
+
 const characterManager = require('../characterManager')
 
-describe('Character Manager', () => {
-  // Note: CharacterManager uses in-memory storage that persists between tests
-  // We'll use unique user IDs for each test to avoid conflicts
-  
-  let testUserId
+// Helper to mock fetch responses - call in sequence for multiple fetches
+const mockFetchResponse = (data, ok = true) => {
+  fetch.mockResolvedValueOnce({
+    ok,
+    json: jest.fn().mockResolvedValueOnce(data)
+  })
+}
 
+describe('CharacterManager', () => {
   beforeEach(() => {
-    // Use unique user ID for each test
-    testUserId = `testuser_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`
+    jest.clearAllMocks()
+    // Clear the internal cache
+    characterManager.invalidateCache('user1')
+    characterManager.invalidateCache('user999')
   })
 
   describe('getUserCharacters', () => {
-    it('should create default character if none exist', () => {
-      const characters = characterManager.getUserCharacters(testUserId)
+    it('should return characters from API', async () => {
+      const mockCharacters = [
+        { id: 'char1', name: 'Hero', shape: 'cube', level: 5, isPrimary: true }
+      ]
+      // First fetch: /api/characters (auth check)
+      mockFetchResponse({})
+      // Second fetch: /api/characters/user/:userId
+      mockFetchResponse({ characters: mockCharacters })
+
+      const characters = await characterManager.getUserCharacters('user1')
       
-      expect(characters).toHaveLength(1)
-      expect(characters[0]).toHaveProperty('id')
-      expect(characters[0]).toHaveProperty('userId', testUserId)
-      expect(characters[0]).toHaveProperty('name', 'My Character')
-      expect(characters[0]).toHaveProperty('level', 1)
-      expect(characters[0]).toHaveProperty('isPrimary', true)
+      expect(characters).toEqual(mockCharacters)
+      expect(fetch).toHaveBeenCalledTimes(2)
     })
 
-    it('should use account shape and color for default character', () => {
-      const characters = characterManager.getUserCharacters(testUserId, 'sphere', 0xff0000)
-      
-      expect(characters[0].shape).toBe('sphere')
-      expect(characters[0].color).toBe(0xff0000)
-    })
+    it('should return empty array and attempt to create default when API returns not ok', async () => {
+      // First fetch: /api/characters
+      mockFetchResponse({})
+      // Second fetch: /api/characters/user/:userId - fails
+      mockFetchResponse({ message: 'Not found' }, false)
+      // Third fetch: createCharacter POST
+      mockFetchResponse({ character: { id: 'new1', name: 'My Character' } })
+      // Fourth fetch: setPrimaryCharacter PUT
+      mockFetchResponse({ character: { id: 'new1', isPrimary: true } })
 
-    it('should return existing characters without creating new ones', () => {
-      // Get characters (creates default)
-      const firstCall = characterManager.getUserCharacters(testUserId)
-      const firstId = firstCall[0].id
+      const characters = await characterManager.getUserCharacters('user999')
       
-      // Get again
-      const secondCall = characterManager.getUserCharacters(testUserId)
-      
-      expect(secondCall).toHaveLength(1)
-      expect(secondCall[0].id).toBe(firstId)
+      expect(Array.isArray(characters)).toBe(true)
     })
   })
 
   describe('createCharacter', () => {
-    it('should create character with correct initial stats', () => {
-      const character = characterManager.createCharacter(testUserId, 'Warrior', 'cube', 0xff0000)
-      
-      expect(character).toHaveProperty('id')
-      expect(character.userId).toBe(testUserId)
-      expect(character.name).toBe('Warrior')
-      expect(character.shape).toBe('cube')
-      expect(character.color).toBe(0xff0000)
-      expect(character.level).toBe(1)
-      expect(character.experience).toBe(0)
-      expect(character.experienceToNextLevel).toBe(100)
-      expect(character.totalKills).toBe(0)
-      expect(character.totalDeaths).toBe(0)
-      expect(character.isPrimary).toBe(false)
-    })
-
-    it('should use default values if not provided', () => {
-      const character = characterManager.createCharacter(testUserId)
-      
-      expect(character.shape).toBe('cube')
-      expect(character.color).toBe(0x00ff00)
-      expect(character.name).toBeTruthy()
-    })
-
-    it('should generate unique character IDs', () => {
-      const char1 = characterManager.createCharacter(testUserId, 'First')
-      const char2 = characterManager.createCharacter(testUserId, 'Second')
-      
-      expect(char1.id).not.toBe(char2.id)
-    })
-
-    it('should enforce 5 character limit', () => {
-      // Create 5 characters
-      for (let i = 0; i < 5; i++) {
-        characterManager.createCharacter(testUserId, `Character ${i}`)
+    it('should create a character via POST request', async () => {
+      const mockCharacter = {
+        id: 'char1',
+        name: 'Warrior',
+        shape: 'cube',
+        color: '#ff0000',
+        level: 1
       }
-      
-      const characters = characterManager.getUserCharacters(testUserId)
-      expect(characters).toHaveLength(5)
-      
-      // Try to create 6th
-      expect(() => {
-        characterManager.createCharacter(testUserId, 'Sixth')
-      }).toThrow('Maximum character limit reached')
+      mockFetchResponse({ character: mockCharacter })
+
+      const character = await characterManager.createCharacter('user1', 'Warrior', 'cube', '#ff0000')
+
+      expect(character).toEqual(mockCharacter)
+      expect(fetch).toHaveBeenCalledWith(
+        expect.stringContaining('/api/characters/user/user1'),
+        expect.objectContaining({
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ name: 'Warrior', shape: 'cube', color: '#ff0000' })
+        })
+      )
     })
 
-    it('should have correct base stats', () => {
-      const character = characterManager.createCharacter(testUserId, 'Test')
-      
-      expect(character.baseMaxHealth).toBe(100)
-      expect(character.baseMaxMana).toBe(50)
-      expect(character.baseMovementSpeed).toBe(1.0)
-      expect(character.baseDamageMultiplier).toBe(1.0)
-      expect(character.baseDefense).toBe(0)
-      expect(character.weaponType).toBe('basic')
-    })
+    it('should throw error when API fails', async () => {
+      mockFetchResponse({ message: 'Server error' }, false)
 
-    it('should set timestamps', () => {
-      const character = characterManager.createCharacter(testUserId, 'Test')
-      
-      expect(character.createdAt).toBeDefined()
-      expect(character.lastPlayed).toBeDefined()
-      
-      // Verify they are valid ISO strings
-      expect(() => new Date(character.createdAt)).not.toThrow()
-      expect(() => new Date(character.lastPlayed)).not.toThrow()
-      
-      // Verify timestamps are recent (within last second)
-      const now = Date.now()
-      const createdTime = new Date(character.createdAt).getTime()
-      expect(now - createdTime).toBeLessThan(1000)
+      await expect(characterManager.createCharacter('user1', 'Test', 'cube', '#000'))
+        .rejects.toThrow()
     })
   })
 
   describe('getCharacter', () => {
-    it('should get specific character by ID', () => {
-      const created = characterManager.createCharacter(testUserId, 'FindMe', 'sphere', 0xff00ff)
-      
-      const found = characterManager.getCharacter(testUserId, created.id)
-      
-      expect(found).not.toBeNull()
-      expect(found.id).toBe(created.id)
-      expect(found.name).toBe('FindMe')
+    it('should get a specific character by ID', async () => {
+      const mockCharacter = { id: 'char1', name: 'Hero', level: 10 }
+      mockFetchResponse({ character: mockCharacter })
+
+      const character = await characterManager.getCharacter('user1', 'char1')
+
+      expect(character).toEqual(mockCharacter)
+      expect(fetch).toHaveBeenCalledWith(
+        expect.stringContaining('/api/characters/char1')
+      )
     })
 
-    it('should return null for non-existent character', () => {
-      const found = characterManager.getCharacter(testUserId, 'nonexistent_id')
-      
-      expect(found).toBeNull()
-    })
+    it('should return null when character not found', async () => {
+      mockFetchResponse({}, false)
 
-    it('should not return character from different user', () => {
-      const otherUserId = `other_${Date.now()}`
-      const character = characterManager.createCharacter(otherUserId, 'Other')
-      
-      const found = characterManager.getCharacter(testUserId, character.id)
-      
-      expect(found).toBeNull()
+      const character = await characterManager.getCharacter('user1', 'nonexistent')
+
+      expect(character).toBeNull()
     })
   })
 
   describe('getPrimaryCharacter', () => {
-    it('should return primary character', () => {
-      const char1 = characterManager.createCharacter(testUserId, 'First')
-      const char2 = characterManager.createCharacter(testUserId, 'Second')
-      
-      characterManager.setPrimaryCharacter(testUserId, char2.id)
-      
-      const primary = characterManager.getPrimaryCharacter(testUserId)
-      
-      expect(primary).not.toBeNull()
-      expect(primary.id).toBe(char2.id)
-      expect(primary.isPrimary).toBe(true)
+    it('should get primary character for user', async () => {
+      const mockCharacter = { id: 'char1', name: 'Main', isPrimary: true }
+      mockFetchResponse({ character: mockCharacter })
+
+      const character = await characterManager.getPrimaryCharacter('user1')
+
+      expect(character).toEqual(mockCharacter)
+      expect(fetch).toHaveBeenCalledWith(
+        expect.stringContaining('/api/characters/user/user1/primary')
+      )
     })
 
-    it('should return first character if no primary set', () => {
-      const char1 = characterManager.createCharacter(testUserId, 'First')
-      const char2 = characterManager.createCharacter(testUserId, 'Second')
-      
-      const primary = characterManager.getPrimaryCharacter(testUserId)
-      
-      expect(primary).not.toBeNull()
-      expect(primary.id).toBe(char1.id)
-    })
+    it('should return null when no primary character', async () => {
+      mockFetchResponse({}, false)
 
-    it('should return default character if none exist', () => {
-      const primary = characterManager.getPrimaryCharacter(testUserId)
-      
-      expect(primary).not.toBeNull()
-      expect(primary.name).toBe('My Character')
-      expect(primary.isPrimary).toBe(true)
+      const character = await characterManager.getPrimaryCharacter('user999')
+
+      expect(character).toBeNull()
     })
   })
 
   describe('setPrimaryCharacter', () => {
-    it('should set character as primary', () => {
-      const char1 = characterManager.createCharacter(testUserId, 'First')
-      const char2 = characterManager.createCharacter(testUserId, 'Second')
-      
-      const success = characterManager.setPrimaryCharacter(testUserId, char2.id)
-      
-      expect(success).toBe(true)
-      
-      const characters = characterManager.getUserCharacters(testUserId)
-      expect(characters.find(c => c.id === char1.id).isPrimary).toBe(false)
-      expect(characters.find(c => c.id === char2.id).isPrimary).toBe(true)
+    it('should set character as primary via PUT', async () => {
+      mockFetchResponse({ character: { isPrimary: true } })
+
+      const result = await characterManager.setPrimaryCharacter('user1', 'char2')
+
+      expect(result).toBe(true)
+      expect(fetch).toHaveBeenCalledWith(
+        expect.stringContaining('/api/characters/char2'),
+        expect.objectContaining({
+          method: 'PUT',
+          body: JSON.stringify({ isPrimary: true })
+        })
+      )
     })
 
-    it('should remove primary flag from previous primary', () => {
-      const char1 = characterManager.createCharacter(testUserId, 'First')
-      const char2 = characterManager.createCharacter(testUserId, 'Second')
-      
-      characterManager.setPrimaryCharacter(testUserId, char1.id)
-      characterManager.setPrimaryCharacter(testUserId, char2.id)
-      
-      const characters = characterManager.getUserCharacters(testUserId)
-      const primaryCount = characters.filter(c => c.isPrimary).length
-      
-      expect(primaryCount).toBe(1)
-      expect(characters.find(c => c.id === char2.id).isPrimary).toBe(true)
-    })
+    it('should return false when API fails', async () => {
+      mockFetchResponse({}, false)
 
-    it('should return false for non-existent character', () => {
-      const success = characterManager.setPrimaryCharacter(testUserId, 'nonexistent_id')
-      
-      expect(success).toBe(false)
+      const result = await characterManager.setPrimaryCharacter('user1', 'char999')
+
+      expect(result).toBe(false)
     })
   })
 
   describe('updateCharacter', () => {
-    it('should update character stats', () => {
-      const character = characterManager.createCharacter(testUserId, 'Test')
-      
-      const updated = characterManager.updateCharacter(testUserId, character.id, {
-        level: 5,
-        experience: 250,
-        totalKills: 100
-      })
-      
-      expect(updated).not.toBeNull()
-      expect(updated.level).toBe(5)
-      expect(updated.experience).toBe(250)
-      expect(updated.totalKills).toBe(100)
+    it('should update character via PUT', async () => {
+      const mockUpdated = { id: 'char1', name: 'Updated Name', level: 5 }
+      mockFetchResponse({ character: mockUpdated })
+
+      const character = await characterManager.updateCharacter('user1', 'char1', { name: 'Updated Name' })
+
+      expect(character).toEqual(mockUpdated)
+      expect(fetch).toHaveBeenCalledWith(
+        expect.stringContaining('/api/characters/char1'),
+        expect.objectContaining({
+          method: 'PUT',
+          body: JSON.stringify({ name: 'Updated Name' })
+        })
+      )
     })
 
-    it('should update lastPlayed timestamp', () => {
-      const character = characterManager.createCharacter(testUserId, 'Test')
-      
-      const updated = characterManager.updateCharacter(testUserId, character.id, {
-        totalKills: 1
-      })
-      
-      expect(updated.lastPlayed).toBeDefined()
-      expect(() => new Date(updated.lastPlayed)).not.toThrow()
-      
-      // Verify it's a recent timestamp
-      const now = Date.now()
-      const lastPlayedTime = new Date(updated.lastPlayed).getTime()
-      expect(now - lastPlayedTime).toBeLessThan(1000)
-    })
+    it('should return null when API fails', async () => {
+      mockFetchResponse({}, false)
 
-    it('should return null for non-existent character', () => {
-      const result = characterManager.updateCharacter(testUserId, 'nonexistent', { level: 10 })
-      
-      expect(result).toBeNull()
+      const character = await characterManager.updateCharacter('user1', 'char1', { level: 99 })
+
+      expect(character).toBeNull()
     })
   })
 
   describe('addExperience', () => {
-    it('should add experience without leveling up', () => {
-      const character = characterManager.createCharacter(testUserId, 'Test')
-      
-      const result = characterManager.addExperience(testUserId, character.id, 50)
-      
-      expect(result.leveledUp).toBe(false)
-      expect(result.newLevel).toBe(1)
-      expect(result.character.experience).toBe(50)
-      expect(result.character.level).toBe(1)
-    })
+    it('should add experience via PATCH', async () => {
+      const mockCharacter = { id: 'char1', level: 2, experience: 50 }
+      mockFetchResponse({ character: mockCharacter })
 
-    it('should trigger level up at threshold', () => {
-      const character = characterManager.createCharacter(testUserId, 'Test')
-      
-      // Level 1 → 2 requires 100 XP
-      const result = characterManager.addExperience(testUserId, character.id, 100)
-      
-      expect(result.leveledUp).toBe(true)
+      const result = await characterManager.addExperience('user1', 'char1', 100)
+
+      expect(result.character).toEqual(mockCharacter)
       expect(result.newLevel).toBe(2)
-      expect(result.character.level).toBe(2)
-      expect(result.character.experience).toBe(0)
+      expect(fetch).toHaveBeenCalledWith(
+        expect.stringContaining('/api/characters/char1/stats'),
+        expect.objectContaining({
+          method: 'PATCH',
+          body: JSON.stringify({ experience: 100 })
+        })
+      )
     })
 
-    it('should handle multiple level ups', () => {
-      const character = characterManager.createCharacter(testUserId, 'Test')
-      
-      // Give massive XP
-      const result = characterManager.addExperience(testUserId, character.id, 1000)
-      
-      expect(result.leveledUp).toBe(true)
-      expect(result.character.level).toBeGreaterThan(2)
-    })
+    it('should return default result when API fails', async () => {
+      mockFetchResponse({}, false)
 
-    it('should increase stats on level up', () => {
-      const character = characterManager.createCharacter(testUserId, 'Test')
-      const initialHealth = character.baseMaxHealth
-      const initialMana = character.baseMaxMana
-      const initialDefense = character.baseDefense
-      
-      // Level up
-      characterManager.addExperience(testUserId, character.id, 100)
-      
-      const updated = characterManager.getCharacter(testUserId, character.id)
-      
-      expect(updated.baseMaxHealth).toBe(initialHealth + 10)
-      expect(updated.baseMaxMana).toBe(initialMana + 5)
-      expect(updated.baseDefense).toBe(initialDefense + 1)
-    })
+      const result = await characterManager.addExperience('user1', 'char1', 50)
 
-    it('should use exponential XP curve', () => {
-      const character = characterManager.createCharacter(testUserId, 'Test')
-      
-      // Level 1 → 2
-      characterManager.addExperience(testUserId, character.id, 100)
-      const level2XP = character.experienceToNextLevel
-      
-      // Level 2 → 3
-      characterManager.addExperience(testUserId, character.id, level2XP)
-      const level3XP = character.experienceToNextLevel
-      
-      // XP requirement should increase
-      expect(level3XP).toBeGreaterThan(level2XP)
-      expect(level2XP).toBeGreaterThan(100)
-    })
-
-    it('should carry over excess XP', () => {
-      const character = characterManager.createCharacter(testUserId, 'Test')
-      
-      // Give 150 XP (100 to level up, 50 excess)
-      const result = characterManager.addExperience(testUserId, character.id, 150)
-      
-      expect(result.character.level).toBe(2)
-      expect(result.character.experience).toBe(50)
-    })
-
-    it('should update lastPlayed timestamp', () => {
-      const character = characterManager.createCharacter(testUserId, 'Test')
-      
-      // Note: In JavaScript, operations happen so fast that timestamps may be identical
-      // The important thing is that lastPlayed is set and is a valid timestamp
-      characterManager.addExperience(testUserId, character.id, 10)
-      
-      const updated = characterManager.getCharacter(testUserId, character.id)
-      expect(updated.lastPlayed).toBeDefined()
-      expect(() => new Date(updated.lastPlayed)).not.toThrow()
-      
-      // Verify it's a recent timestamp
-      const now = Date.now()
-      const lastPlayedTime = new Date(updated.lastPlayed).getTime()
-      expect(now - lastPlayedTime).toBeLessThan(1000)
+      expect(result.leveledUp).toBe(false)
+      expect(result.character).toBeNull()
     })
   })
 
   describe('deleteCharacter', () => {
-    it('should delete character successfully', () => {
-      const char1 = characterManager.createCharacter(testUserId, 'First')
-      const char2 = characterManager.createCharacter(testUserId, 'Second')
-      
-      const success = characterManager.deleteCharacter(testUserId, char1.id)
-      
-      expect(success).toBe(true)
-      
-      const characters = characterManager.getUserCharacters(testUserId)
-      expect(characters).toHaveLength(1)
-      expect(characters[0].id).toBe(char2.id)
+    it('should delete character via DELETE', async () => {
+      mockFetchResponse({ success: true })
+
+      const result = await characterManager.deleteCharacter('user1', 'char1')
+
+      expect(result).toBe(true)
+      expect(fetch).toHaveBeenCalledWith(
+        expect.stringContaining('/api/characters/char1/user/user1'),
+        expect.objectContaining({ method: 'DELETE' })
+      )
     })
 
-    it('should throw error when deleting last character', () => {
-      const character = characterManager.createCharacter(testUserId, 'Only')
-      
-      expect(() => {
-        characterManager.deleteCharacter(testUserId, character.id)
-      }).toThrow('Cannot delete last character')
-    })
+    it('should throw when API returns error with message', async () => {
+      mockFetchResponse({ message: 'Cannot delete primary' }, false)
 
-    it('should return false for non-existent character', () => {
-      characterManager.createCharacter(testUserId, 'Exists')
-      
-      const success = characterManager.deleteCharacter(testUserId, 'nonexistent_id')
-      
-      expect(success).toBe(false)
-    })
-
-    it('should return false for non-existent user', () => {
-      const success = characterManager.deleteCharacter('nonexistent_user', 'some_id')
-      
-      expect(success).toBe(false)
-    })
-
-    it('should allow deleting non-primary character', () => {
-      const char1 = characterManager.createCharacter(testUserId, 'First')
-      const char2 = characterManager.createCharacter(testUserId, 'Second')
-      
-      characterManager.setPrimaryCharacter(testUserId, char1.id)
-      
-      const success = characterManager.deleteCharacter(testUserId, char2.id)
-      
-      expect(success).toBe(true)
-      
-      // Primary should still be char1
-      const primary = characterManager.getPrimaryCharacter(testUserId)
-      expect(primary.id).toBe(char1.id)
+      await expect(characterManager.deleteCharacter('user1', 'char1'))
+        .rejects.toThrow('Cannot delete primary')
     })
   })
 
   describe('getCharacterStats', () => {
-    it('should return formatted stats for character', () => {
-      const character = characterManager.createCharacter(testUserId, 'Test')
-      
+    it('should return formatted stats object', () => {
+      const character = {
+        level: 10,
+        experience: 500,
+        experienceToNextLevel: 1000,
+        baseMaxHealth: 200,
+        baseMaxMana: 100,
+        baseMovementSpeed: 1.5,
+        baseDamageMultiplier: 1.2,
+        baseDefense: 15,
+        totalKills: 50,
+        totalDeaths: 5
+      }
+
       const stats = characterManager.getCharacterStats(character)
-      
-      expect(stats).toHaveProperty('level', 1)
-      expect(stats).toHaveProperty('experience', 0)
-      expect(stats).toHaveProperty('experienceToNextLevel', 100)
-      expect(stats).toHaveProperty('health', 100)
-      expect(stats).toHaveProperty('maxHealth', 100)
-      expect(stats).toHaveProperty('mana', 50)
-      expect(stats).toHaveProperty('maxMana', 50)
-      expect(stats).toHaveProperty('movementSpeed', 1.0)
-      expect(stats).toHaveProperty('damageMultiplier', 1.0)
-      expect(stats).toHaveProperty('defense', 0)
-      expect(stats).toHaveProperty('totalKills', 0)
-      expect(stats).toHaveProperty('totalDeaths', 0)
+
+      expect(stats).toEqual({
+        level: 10,
+        experience: 500,
+        experienceToNextLevel: 1000,
+        health: 200,
+        maxHealth: 200,
+        mana: 100,
+        maxMana: 100,
+        movementSpeed: 1.5,
+        damageMultiplier: 1.2,
+        defense: 15,
+        totalKills: 50,
+        totalDeaths: 5
+      })
     })
 
     it('should return null for null character', () => {
-      const stats = characterManager.getCharacterStats(null)
-      
-      expect(stats).toBeNull()
-    })
-
-    it('should reflect leveled up stats', () => {
-      const character = characterManager.createCharacter(testUserId, 'Test')
-      
-      // Level up
-      characterManager.addExperience(testUserId, character.id, 100)
-      
-      const updated = characterManager.getCharacter(testUserId, character.id)
-      const stats = characterManager.getCharacterStats(updated)
-      
-      expect(stats.level).toBe(2)
-      expect(stats.maxHealth).toBe(110) // +10 per level
-      expect(stats.maxMana).toBe(55)    // +5 per level
-      expect(stats.defense).toBe(1)     // +1 per level
+      expect(characterManager.getCharacterStats(null)).toBeNull()
     })
   })
 
-  describe('Character Lifecycle', () => {
-    it('should support full character lifecycle', () => {
-      // Create multiple characters
-      const warrior = characterManager.createCharacter(testUserId, 'Warrior', 'cube', 0xff0000)
-      const mage = characterManager.createCharacter(testUserId, 'Mage', 'sphere', 0x0000ff)
-      const rogue = characterManager.createCharacter(testUserId, 'Rogue', 'cone', 0x00ff00)
-      
-      // Set mage as primary
-      characterManager.setPrimaryCharacter(testUserId, mage.id)
-      
-      // Level up warrior
-      const levelResult = characterManager.addExperience(testUserId, warrior.id, 500)
-      expect(levelResult.leveledUp).toBe(true)
-      
-      // Update rogue
-      characterManager.updateCharacter(testUserId, rogue.id, {
-        totalKills: 50,
-        totalDeaths: 2
-      })
-      
-      // Get all characters
-      const all = characterManager.getUserCharacters(testUserId)
-      expect(all).toHaveLength(3)
-      
-      // Verify primary
-      const primary = characterManager.getPrimaryCharacter(testUserId)
-      expect(primary.id).toBe(mage.id)
-      
-      // Delete rogue
-      characterManager.deleteCharacter(testUserId, rogue.id)
-      
-      // Should have 2 left
-      const remaining = characterManager.getUserCharacters(testUserId)
-      expect(remaining).toHaveLength(2)
-      expect(remaining.find(c => c.id === rogue.id)).toBeUndefined()
-    })
-  })
-
-  describe('Edge Cases', () => {
-    it('should handle creating character with empty name', () => {
-      const character = characterManager.createCharacter(testUserId, '')
-      
-      // Should use default name
-      expect(character.name).toBeTruthy()
-      expect(character.name.length).toBeGreaterThan(0)
-    })
-
-    it('should handle adding zero experience', () => {
-      const character = characterManager.createCharacter(testUserId, 'Test')
-      
-      const result = characterManager.addExperience(testUserId, character.id, 0)
-      
-      expect(result.leveledUp).toBe(false)
-      expect(result.character.experience).toBe(0)
-    })
-
-    it('should handle negative experience gracefully', () => {
-      const character = characterManager.createCharacter(testUserId, 'Test')
-      
-      const result = characterManager.addExperience(testUserId, character.id, -10)
-      
-      // Should not decrease (or handle gracefully)
-      expect(result.character.experience).toBeLessThanOrEqual(0)
-    })
-
-    it('should maintain character order', () => {
-      const char1 = characterManager.createCharacter(testUserId, 'First')
-      const char2 = characterManager.createCharacter(testUserId, 'Second')
-      const char3 = characterManager.createCharacter(testUserId, 'Third')
-      
-      const characters = characterManager.getUserCharacters(testUserId)
-      
-      expect(characters[0].id).toBe(char1.id)
-      expect(characters[1].id).toBe(char2.id)
-      expect(characters[2].id).toBe(char3.id)
-    })
-  })
-
-  describe('Data Integrity', () => {
-    it('should preserve all character data after updates', () => {
-      const character = characterManager.createCharacter(testUserId, 'Persistent', 'sphere', 0xff00ff)
-      const originalId = character.id
-      const originalCreatedAt = character.createdAt
-      
-      // Update some stats
-      characterManager.updateCharacter(testUserId, character.id, {
-        totalKills: 10
-      })
-      
-      // Level up
-      characterManager.addExperience(testUserId, character.id, 100)
-      
-      // Get character
-      const final = characterManager.getCharacter(testUserId, character.id)
-      
-      // Should preserve core data
-      expect(final.id).toBe(originalId)
-      expect(final.name).toBe('Persistent')
-      expect(final.shape).toBe('sphere')
-      expect(final.color).toBe(0xff00ff)
-      expect(final.createdAt).toBe(originalCreatedAt)
-      
-      // Should have updated data
-      expect(final.level).toBe(2)
-      expect(final.totalKills).toBe(10)
+  describe('invalidateCache', () => {
+    it('should not throw when invalidating cache', () => {
+      expect(() => characterManager.invalidateCache('user1')).not.toThrow()
     })
   })
 })
