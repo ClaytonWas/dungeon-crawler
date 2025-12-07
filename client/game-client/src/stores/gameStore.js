@@ -25,8 +25,10 @@ export const useGameStore = create((set, get) => ({
   enemies: [],
   loot: [],
   
-  // Chat
-  messages: [],
+  // Chat - separate channels
+  globalMessages: [],
+  partyMessages: [],
+  activeChatTab: 'global', // 'global' | 'party' | future: 'friends'
   
   // Character stats
   characterStats: null,
@@ -84,9 +86,14 @@ export const useGameStore = create((set, get) => ({
     loot: state.loot.filter(l => l.id !== lootId)
   })),
   
-  addMessage: (message) => set((state) => ({
-    messages: [...state.messages.slice(-99), message]
+  addGlobalMessage: (message) => set((state) => ({
+    globalMessages: [...state.globalMessages.slice(-99), message]
   })),
+  addPartyMessage: (message) => set((state) => ({
+    partyMessages: [...state.partyMessages.slice(-99), message]
+  })),
+  clearPartyMessages: () => set({ partyMessages: [] }),
+  setActiveChatTab: (tab) => set({ activeChatTab: tab }),
   
   setCharacterStats: (stats) => set({ characterStats: stats }),
   setWeaponStats: (stats) => set({ weaponStats: stats }),

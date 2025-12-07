@@ -3,13 +3,28 @@ import { useGameStore } from '../../stores/gameStore'
 import toast from 'react-hot-toast'
 
 export default function SocialTab() {
-  const { socket, partyId, partyMembers, partyLeaderId, playerId, messages, inHubWorld, inDungeon } = useGameStore()
+  const { 
+    socket, 
+    partyId, 
+    partyMembers, 
+    partyLeaderId, 
+    playerId, 
+    globalMessages, 
+    partyMessages, 
+    activeChatTab, 
+    setActiveChatTab,
+    inHubWorld, 
+    inDungeon 
+  } = useGameStore()
   const [message, setMessage] = useState('')
   const messagesEndRef = useRef(null)
   
+  // Get messages for current tab
+  const currentMessages = activeChatTab === 'party' ? partyMessages : globalMessages
+  
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
-  }, [messages])
+  }, [currentMessages])
   
   const createParty = () => {
     socket?.emit('createParty')
@@ -41,7 +56,15 @@ export default function SocialTab() {
   const sendMessage = (e) => {
     e.preventDefault()
     if (message.trim()) {
-      socket?.emit('sendGlobalUserMessage', message.trim())
+      if (activeChatTab === 'party') {
+        if (!partyId) {
+          toast.error('Join a party to use party chat')
+          return
+        }
+        socket?.emit('sendPartyMessage', message.trim())
+      } else {
+        socket?.emit('sendGlobalUserMessage', message.trim())
+      }
       setMessage('')
     }
   }
@@ -109,20 +132,49 @@ export default function SocialTab() {
       
       {/* Chat Section */}
       <div className="glass rounded-lg p-4 flex flex-col" style={{ height: '300px' }}>
-        <h3 className="text-crimson font-semibold mb-2 uppercase tracking-wider text-sm">
-          Chat
-        </h3>
-        <div className="text-xs text-gray-400 mb-3">
-          {inHubWorld ? '🌍 Hub World' : inDungeon ? '⚔️ Party Chat' : ''}
+        {/* Chat Tab Headers */}
+        <div className="flex border-b border-gray-700 mb-3">
+          <button
+            onClick={() => setActiveChatTab('global')}
+            className={`flex-1 py-2 px-3 text-xs font-semibold uppercase tracking-wider transition-colors ${
+              activeChatTab === 'global'
+                ? 'text-crimson border-b-2 border-crimson'
+                : 'text-gray-400 hover:text-gray-200'
+            }`}
+          >
+            🌍 Global
+          </button>
+          <button
+            onClick={() => setActiveChatTab('party')}
+            className={`flex-1 py-2 px-3 text-xs font-semibold uppercase tracking-wider transition-colors ${
+              activeChatTab === 'party'
+                ? 'text-crimson border-b-2 border-crimson'
+                : 'text-gray-400 hover:text-gray-200'
+            } ${!partyId ? 'opacity-50' : ''}`}
+          >
+            ⚔️ Party
+            {partyMessages.length > 0 && activeChatTab !== 'party' && (
+              <span className="ml-1 bg-crimson text-white text-xs px-1.5 py-0.5 rounded-full">
+                {partyMessages.length}
+              </span>
+            )}
+          </button>
         </div>
         
+        {/* Chat Messages */}
         <div className="flex-1 overflow-y-auto space-y-2 mb-3">
-          {messages.length === 0 ? (
+          {activeChatTab === 'party' && !partyId ? (
+            <p className="text-gray-500 text-sm text-center py-4">
+              Join a party to use party chat
+            </p>
+          ) : currentMessages.length === 0 ? (
             <p className="text-gray-500 text-sm text-center">No messages yet</p>
           ) : (
-            messages.map((msg, i) => (
+            currentMessages.map((msg, i) => (
               <div key={i} className="text-sm">
-                <span className="text-crimson font-semibold">{msg.username}: </span>
+                <span className={`font-semibold ${activeChatTab === 'party' ? 'text-dark-gold' : 'text-crimson'}`}>
+                  {msg.username}:{' '}
+                </span>
                 <span className="text-gray-200">{msg.message}</span>
               </div>
             ))
@@ -135,10 +187,15 @@ export default function SocialTab() {
             type="text"
             value={message}
             onChange={(e) => setMessage(e.target.value)}
-            placeholder="Type a message..."
+            placeholder={activeChatTab === 'party' ? 'Party message...' : 'Global message...'}
             className="input-field flex-1 text-sm"
+            disabled={activeChatTab === 'party' && !partyId}
           />
-          <button type="submit" className="btn-primary px-4">
+          <button 
+            type="submit" 
+            className="btn-primary px-4"
+            disabled={activeChatTab === 'party' && !partyId}
+          >
             Send
           </button>
         </form>

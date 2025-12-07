@@ -4,7 +4,10 @@ import { useGameStore } from './stores/gameStore'
 import GameCanvas from './components/GameCanvas'
 import RightPanel from './components/RightPanel'
 
-const PROFILE_SERVER_URL = import.meta.env.VITE_PROFILE_SERVER_URL || 'http://localhost:3000'
+// Dynamically determine profile server URL based on current browser location
+// This allows the same build to work on localhost AND LAN
+// Always use current hostname - this ensures LAN clients connect to the right server
+const PROFILE_SERVER_URL = `${window.location.protocol}//${window.location.hostname}:3000`
 
 function App() {
   const [playTicket, setPlayTicket] = useState(null)

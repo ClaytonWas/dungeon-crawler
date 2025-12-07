@@ -7,13 +7,15 @@ export default function Login() {
   const [password, setPassword] = useState('')
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
+  const [sessionConflict, setSessionConflict] = useState(false)
   
   const login = useAuthStore(state => state.login)
   const navigate = useNavigate()
 
-  const handleSubmit = async (e) => {
-    e.preventDefault()
+  const handleSubmit = async (e, forceLogin = false) => {
+    e?.preventDefault()
     setError('')
+    setSessionConflict(false)
     setLoading(true)
 
     try {
@@ -21,7 +23,7 @@ export default function Login() {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         credentials: 'include',
-        body: JSON.stringify({ username, password })
+        body: JSON.stringify({ username, password, forceLogin })
       })
 
       const data = await response.json()
@@ -29,6 +31,9 @@ export default function Login() {
       if (response.ok) {
         login(data.user)
         navigate('/home')
+      } else if (response.status === 409 && data.code === 'SESSION_EXISTS') {
+        setSessionConflict(true)
+        setError(`This account is already logged in elsewhere (${data.activeSessions} active session${data.activeSessions > 1 ? 's' : ''}).`)
       } else {
         setError(data.message || 'Login failed')
       }
@@ -38,6 +43,10 @@ export default function Login() {
     } finally {
       setLoading(false)
     }
+  }
+
+  const handleForceLogin = () => {
+    handleSubmit(null, true)
   }
 
   return (
@@ -51,6 +60,15 @@ export default function Login() {
         {error && (
           <div className="bg-red-900/30 border border-red-700 text-red-300 px-4 py-3 rounded-lg mb-4">
             {error}
+            {sessionConflict && (
+              <button
+                onClick={handleForceLogin}
+                disabled={loading}
+                className="mt-3 w-full py-2 px-4 bg-yellow-600 hover:bg-yellow-500 text-white font-semibold rounded-lg transition-colors disabled:opacity-50"
+              >
+                {loading ? 'Logging in...' : 'Force Login (Logout Other Sessions)'}
+              </button>
+            )}
           </div>
         )}
 

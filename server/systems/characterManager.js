@@ -3,58 +3,125 @@
  * 
  * Handles multiple characters per user account.
  * Each character has persistent stats (level, experience, etc.)
- * Users can create, select, delete, and level up characters.
+ * Now backed by Profile API database for persistence across server restarts.
  */
 
-// In-memory storage (TODO: Replace with database)
-const userCharacters = new Map() // userId -> Array of character objects
+const fetch = require('node-fetch')
+
+const PROFILE_API = process.env.PROFILE_API_URL || 'http://profile-api:3001'
+
+// Local cache for performance (reduces API calls during gameplay)
+const characterCache = new Map() // userId -> { characters: [], lastFetch: timestamp }
+const CACHE_TTL = 60 * 1000 // 1 minute cache
 
 class CharacterManager {
     /**
-     * Get all characters for a user
+     * Get all characters for a user (fetches from API, uses cache)
      * @param {String} userId - User ID
-     * @param {String} accountShape - Optional account default shape
-     * @param {Number} accountColor - Optional account default color
-     * @returns {Array} Array of character objects
+     * @param {String} accountShape - Optional account default shape (for creating default char)
+     * @param {String} accountColor - Optional account default color
+     * @returns {Promise<Array>} Array of character objects
      */
-    getUserCharacters(userId, accountShape = 'cube', accountColor = 0x00ff00) {
-        if (!userCharacters.has(userId)) {
-            // Create default character if none exist and mark as primary
-            // Use account's shape and color if provided
-            const defaultChar = this.createCharacter(userId, 'My Character', accountShape, accountColor)
-            defaultChar.isPrimary = true
-            return [defaultChar]
+    async getUserCharacters(userId, accountShape = 'cube', accountColor = '#00ff00') {
+        // Check cache first
+        const cached = characterCache.get(userId)
+        if (cached && Date.now() - cached.lastFetch < CACHE_TTL) {
+            return cached.characters
         }
-        return userCharacters.get(userId)
+
+        try {
+            const response = await fetch(`${PROFILE_API}/api/characters`, {
+                method: 'GET',
+                headers: { 'Content-Type': 'application/json' }
+            })
+
+            // This endpoint requires auth, so we need internal API access
+            // For now, use internal endpoint that doesn't require session
+            const internalResponse = await fetch(`${PROFILE_API}/api/characters/user/${userId}`)
+            
+            if (!internalResponse.ok) {
+                // Fallback: user has no characters yet, create default
+                console.log(`[CharacterManager] No characters for user ${userId}, creating default`)
+                const defaultChar = await this.createCharacter(userId, 'My Character', accountShape, accountColor)
+                // Set as primary
+                await this.setPrimaryCharacter(userId, defaultChar.id)
+                return [{ ...defaultChar, isPrimary: true }]
+            }
+
+            const data = await internalResponse.json()
+            const characters = data.characters || []
+            
+            // Update cache
+            characterCache.set(userId, { characters, lastFetch: Date.now() })
+            
+            return characters
+        } catch (error) {
+            console.error('[CharacterManager] Error fetching characters:', error)
+            // Return cached data if available, even if stale
+            if (cached) return cached.characters
+            return []
+        }
+    }
+    
+    /**
+     * Sync version for backward compatibility (uses cache only)
+     * Should be called after async fetch has populated cache
+     */
+    getUserCharactersSync(userId) {
+        const cached = characterCache.get(userId)
+        return cached?.characters || []
     }
     
     /**
      * Get primary character for a user
      * @param {String} userId - User ID
-     * @returns {Object|null} Primary character or null
+     * @returns {Promise<Object|null>} Primary character or null
      */
-    getPrimaryCharacter(userId) {
-        const characters = this.getUserCharacters(userId)
-        return characters.find(c => c.isPrimary) || (characters.length > 0 ? characters[0] : null)
+    async getPrimaryCharacter(userId) {
+        try {
+            const response = await fetch(`${PROFILE_API}/api/characters/user/${userId}/primary`)
+            
+            if (!response.ok) {
+                return null
+            }
+
+            const data = await response.json()
+            return data.character || null
+        } catch (error) {
+            console.error('[CharacterManager] Error fetching primary character:', error)
+            // Try from cache
+            const cached = characterCache.get(userId)
+            if (cached) {
+                return cached.characters.find(c => c.isPrimary) || cached.characters[0] || null
+            }
+            return null
+        }
     }
     
     /**
      * Set a character as primary
      * @param {String} userId - User ID
      * @param {String} characterId - Character ID to set as primary
-     * @returns {Boolean} Success status
+     * @returns {Promise<Boolean>} Success status
      */
-    setPrimaryCharacter(userId, characterId) {
-        const characters = this.getUserCharacters(userId)
-        const character = characters.find(c => c.id === characterId)
-        if (!character) return false
-        
-        // Remove primary flag from all characters
-        characters.forEach(c => c.isPrimary = false)
-        
-        // Set new primary
-        character.isPrimary = true
-        return true
+    async setPrimaryCharacter(userId, characterId) {
+        try {
+            const response = await fetch(`${PROFILE_API}/api/characters/${characterId}`, {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ isPrimary: true })
+            })
+            
+            if (response.ok) {
+                // Invalidate cache
+                characterCache.delete(userId)
+                return true
+            }
+            return false
+        } catch (error) {
+            console.error('[CharacterManager] Error setting primary character:', error)
+            return false
+        }
     }
     
     /**
@@ -62,141 +129,173 @@ class CharacterManager {
      * @param {String} userId - User ID
      * @param {String} name - Character name
      * @param {String} shape - Character shape (cube, sphere, cone)
-     * @param {Number} color - Character color (hex number)
-     * @returns {Object} Created character
+     * @param {String} color - Character color (hex string)
+     * @returns {Promise<Object>} Created character
      */
-    createCharacter(userId, name, shape = 'cube', color = 0x00ff00) {
-        if (!userCharacters.has(userId)) {
-            userCharacters.set(userId, [])
+    async createCharacter(userId, name, shape = 'cube', color = '#00ff00') {
+        try {
+            const response = await fetch(`${PROFILE_API}/api/characters/user/${userId}`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ name, shape, color })
+            })
+            
+            if (!response.ok) {
+                const error = await response.json()
+                throw new Error(error.message || 'Failed to create character')
+            }
+
+            const data = await response.json()
+            
+            // Invalidate cache
+            characterCache.delete(userId)
+            
+            return data.character
+        } catch (error) {
+            console.error('[CharacterManager] Error creating character:', error)
+            throw error
         }
-        
-        const characters = userCharacters.get(userId)
-        
-        // Check max characters (limit to 5)
-        if (characters.length >= 5) {
-            throw new Error('Maximum character limit reached (5 characters)')
-        }
-        
-        const character = {
-            id: `${userId}_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
-            userId: userId,
-            name: name || `Character ${characters.length + 1}`,
-            shape: shape,
-            color: color,
-            
-            // Persistent stats
-            level: 1,
-            experience: 0,
-            experienceToNextLevel: 100,
-            
-            // Base stats (these scale with level)
-            baseMaxHealth: 100,
-            baseMaxMana: 50,
-            baseMovementSpeed: 1.0,
-            baseDamageMultiplier: 1.0,
-            baseDefense: 0,
-            
-            // Current weapon
-            weaponType: 'basic',
-            
-            // Metadata
-            createdAt: new Date().toISOString(),
-            lastPlayed: new Date().toISOString(),
-            totalPlayTime: 0, // in seconds
-            totalKills: 0,
-            totalDeaths: 0,
-            isPrimary: false // Primary character (auto-selected on login)
-        }
-        
-        characters.push(character)
-        return character
     }
     
     /**
      * Get a specific character by ID
      * @param {String} userId - User ID
      * @param {String} characterId - Character ID
-     * @returns {Object|null} Character object or null
+     * @returns {Promise<Object|null>} Character object or null
      */
-    getCharacter(userId, characterId) {
-        const characters = this.getUserCharacters(userId)
-        return characters.find(c => c.id === characterId) || null
+    async getCharacter(userId, characterId) {
+        try {
+            const response = await fetch(`${PROFILE_API}/api/characters/${characterId}`)
+            
+            if (!response.ok) {
+                return null
+            }
+
+            const data = await response.json()
+            return data.character || null
+        } catch (error) {
+            console.error('[CharacterManager] Error fetching character:', error)
+            // Try from cache
+            const cached = characterCache.get(userId)
+            if (cached) {
+                return cached.characters.find(c => c.id === characterId) || null
+            }
+            return null
+        }
     }
     
     /**
-     * Update character stats (level up, experience gain, etc.)
+     * Update character stats (calls Profile API)
      * @param {String} userId - User ID
      * @param {String} characterId - Character ID
      * @param {Object} updates - Updates to apply
-     * @returns {Object|null} Updated character or null
+     * @returns {Promise<Object|null>} Updated character or null
      */
-    updateCharacter(userId, characterId, updates) {
-        const character = this.getCharacter(userId, characterId)
-        if (!character) return null
-        
-        Object.assign(character, updates)
-        character.lastPlayed = new Date().toISOString()
-        
-        return character
+    async updateCharacter(userId, characterId, updates) {
+        try {
+            const response = await fetch(`${PROFILE_API}/api/characters/${characterId}`, {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(updates)
+            })
+            
+            if (!response.ok) {
+                return null
+            }
+
+            const data = await response.json()
+            
+            // Invalidate cache
+            characterCache.delete(userId)
+            
+            return data.character
+        } catch (error) {
+            console.error('[CharacterManager] Error updating character:', error)
+            return null
+        }
     }
     
     /**
-     * Add experience to a character
+     * Add experience to a character (and handle level ups via API)
      * @param {String} userId - User ID
      * @param {String} characterId - Character ID
      * @param {Number} expAmount - Experience to add
-     * @returns {Object} { leveledUp: boolean, newLevel: number, character: Object }
+     * @returns {Promise<Object>} { leveledUp: boolean, newLevel: number, character: Object }
      */
-    addExperience(userId, characterId, expAmount) {
-        const character = this.getCharacter(userId, characterId)
-        if (!character) return { leveledUp: false, newLevel: character.level, character: null }
-        
-        character.experience += expAmount
-        let leveledUp = false
-        let newLevel = character.level
-        
-        // Level up if enough experience
-        while (character.experience >= character.experienceToNextLevel) {
-            character.experience -= character.experienceToNextLevel
-            character.level += 1
-            leveledUp = true
-            newLevel = character.level
+    async addExperience(userId, characterId, expAmount) {
+        try {
+            const response = await fetch(`${PROFILE_API}/api/characters/${characterId}/stats`, {
+                method: 'PATCH',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ experience: expAmount })
+            })
             
-            // Increase stats per level
-            character.baseMaxHealth += 10
-            character.baseMaxMana += 5
-            character.baseDefense += 1
+            if (!response.ok) {
+                return { leveledUp: false, newLevel: 1, character: null }
+            }
+
+            const data = await response.json()
+            const character = data.character
             
-            // Increase exp needed for next level (exponential)
-            character.experienceToNextLevel = Math.floor(100 * Math.pow(1.2, character.level - 1))
+            // Invalidate cache
+            characterCache.delete(userId)
+            
+            // Check if leveled up by comparing (would need previous level)
+            const cached = characterCache.get(userId)
+            const oldChar = cached?.characters?.find(c => c.id === characterId)
+            const leveledUp = oldChar ? character.level > oldChar.level : false
+            
+            return { leveledUp, newLevel: character.level, character }
+        } catch (error) {
+            console.error('[CharacterManager] Error adding experience:', error)
+            return { leveledUp: false, newLevel: 1, character: null }
         }
-        
-        character.lastPlayed = new Date().toISOString()
-        
-        return { leveledUp, newLevel, character }
+    }
+    
+    /**
+     * Update character combat stats (kills, deaths, playtime)
+     * @param {String} characterId - Character ID
+     * @param {Object} stats - { kills, deaths, playTime }
+     */
+    async updateCombatStats(characterId, stats) {
+        try {
+            await fetch(`${PROFILE_API}/api/characters/${characterId}/stats`, {
+                method: 'PATCH',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(stats)
+            })
+        } catch (error) {
+            console.error('[CharacterManager] Error updating combat stats:', error)
+        }
     }
     
     /**
      * Delete a character
      * @param {String} userId - User ID
      * @param {String} characterId - Character ID
-     * @returns {Boolean} Success status
+     * @returns {Promise<Boolean>} Success status
      */
-    deleteCharacter(userId, characterId) {
-        if (!userCharacters.has(userId)) return false
-        
-        const characters = userCharacters.get(userId)
-        const index = characters.findIndex(c => c.id === characterId)
-        
-        if (index === -1) return false
-        
-        // Don't allow deleting if it's the last character
-        if (characters.length <= 1) {
-            throw new Error('Cannot delete last character')
+    async deleteCharacter(userId, characterId) {
+        try {
+            const response = await fetch(`${PROFILE_API}/api/characters/${characterId}/user/${userId}`, {
+                method: 'DELETE'
+            })
+            
+            if (response.ok) {
+                // Invalidate cache
+                characterCache.delete(userId)
+                return true
+            }
+            
+            const error = await response.json()
+            if (error.message) {
+                throw new Error(error.message)
+            }
+            return false
+        } catch (error) {
+            console.error('[CharacterManager] Error deleting character:', error)
+            throw error
         }
-        
-        characters.splice(index, 1)
-        return true
     }
     
     /**
@@ -211,7 +310,7 @@ class CharacterManager {
             level: character.level,
             experience: character.experience,
             experienceToNextLevel: character.experienceToNextLevel,
-            health: character.baseMaxHealth, // Current health would be in-match only
+            health: character.baseMaxHealth,
             maxHealth: character.baseMaxHealth,
             mana: character.baseMaxMana,
             maxMana: character.baseMaxMana,
@@ -221,6 +320,14 @@ class CharacterManager {
             totalKills: character.totalKills,
             totalDeaths: character.totalDeaths
         }
+    }
+    
+    /**
+     * Invalidate cache for a user
+     * @param {String} userId - User ID
+     */
+    invalidateCache(userId) {
+        characterCache.delete(userId)
     }
 }
 

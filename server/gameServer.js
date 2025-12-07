@@ -30,6 +30,7 @@ const dungeonRooms = new Map() // Map of roomId -> {enemies: [], loot: [], clear
 const playerToParty = new Map() // Map of socket -> partyId
 const playerToRoom = new Map() // Map of socket -> roomId
 const hubWorldPlayers = new Set() // Players currently in hub world
+const userSockets = new Map() // Map of userId -> socket (for kicking users)
 
 // Default dungeon room
 const defaultDungeonRoom = require('./scenes/dungeon_corridor.json')
@@ -69,7 +70,30 @@ console.log('Allowed CORS origins:', allowedOrigins)
 const checkOrigin = (origin) => {
     if (!origin) return true
     const normalized = normalizeUrl(origin)
-    return allowedOrigins.includes(normalized) || allowedOrigins.includes(origin)
+    
+    // Allow if in explicit list
+    if (allowedOrigins.includes(normalized) || allowedOrigins.includes(origin)) {
+        return true
+    }
+    
+    // Allow any local network IP (192.168.x.x, 10.x.x.x, 172.16-31.x.x) on game ports
+    try {
+        const url = new URL(origin)
+        const hostname = url.hostname
+        const port = url.port
+        
+        // Check if it's a private/local IP
+        const isPrivateIP = /^(192\.168\.|10\.|172\.(1[6-9]|2[0-9]|3[01])\.)/.test(hostname)
+        const isGamePort = ['3000', '5173', '3030', '3001'].includes(port)
+        
+        if (isPrivateIP && isGamePort) {
+            return true
+        }
+    } catch (e) {
+        // Invalid URL, deny
+    }
+    
+    return false
 }
 
 const io = new Server(server, {
@@ -281,21 +305,53 @@ const partyManager = {
             partyId: partyId
         }
         
-        // Initialize enemies for the room
-        const enemyCount = Math.min(party.members.size * 2, 8) // 2 enemies per player, max 8
-        for (let i = 0; i < enemyCount; i++) {
-            room.enemies.push({
-                id: `enemy_${roomId}_${i}`,
-                type: 'goblin',
-                health: 50,
-                maxHealth: 50,
-                position: {
-                    x: (Math.random() - 0.5) * 15,
-                    y: 0.5,
-                    z: (Math.random() - 0.5) * 15
-                },
-                attackCooldown: 0
+        // Initialize enemies based on scene spawners (fallbacks to old logic if none)
+        const sceneSpawners = Array.isArray(defaultDungeonRoom?.gameplay?.spawners)
+            ? defaultDungeonRoom.gameplay.spawners.filter(spawner => spawner.entityType === 'enemy' && spawner.enabled !== false)
+            : []
+
+        if (sceneSpawners.length > 0) {
+            sceneSpawners.forEach(spawner => {
+                const spawnCount = Math.max(0, spawner.count || 0)
+                const [baseX = 0, baseY = 0.5, baseZ = 0] = spawner.position || []
+                const radius = spawner.radius || 0
+
+                for (let i = 0; i < spawnCount; i++) {
+                    const angle = Math.random() * Math.PI * 2
+                    const distance = radius > 0 ? Math.random() * radius : 0
+                    const offsetX = Math.cos(angle) * distance
+                    const offsetZ = Math.sin(angle) * distance
+
+                    room.enemies.push({
+                        id: `enemy_${roomId}_${room.enemies.length}`,
+                        type: spawner.enemyType || 'goblin',
+                        health: 50,
+                        maxHealth: 50,
+                        position: {
+                            x: baseX + offsetX,
+                            y: baseY,
+                            z: baseZ + offsetZ
+                        },
+                        attackCooldown: 0
+                    })
+                }
             })
+        } else {
+            const enemyCount = Math.min(party.members.size * 2, 8) // legacy fallback
+            for (let i = 0; i < enemyCount; i++) {
+                room.enemies.push({
+                    id: `enemy_${roomId}_${i}`,
+                    type: 'goblin',
+                    health: 50,
+                    maxHealth: 50,
+                    position: {
+                        x: (Math.random() - 0.5) * 15,
+                        y: 0.5,
+                        z: (Math.random() - 0.5) * 15
+                    },
+                    attackCooldown: 0
+                })
+            }
         }
         
         dungeonRooms.set(roomId, room)
@@ -467,25 +523,25 @@ const playerMonitor = {
         const userId = socket.user.id
         
         // Get user's characters (pass account shape and color for default character creation)
-        const characters = characterManager.getUserCharacters(userId, socket.user.shape, socket.user.color)
+        const characters = await characterManager.getUserCharacters(userId, socket.user.shape, socket.user.color)
         
         // Determine which character to use
         let selectedCharacter = null
         
         if (characterId) {
-            selectedCharacter = characterManager.getCharacter(userId, characterId)
+            selectedCharacter = await characterManager.getCharacter(userId, characterId)
         }
         
         if (!selectedCharacter) {
-            selectedCharacter = characterManager.getPrimaryCharacter(userId)
+            selectedCharacter = await characterManager.getPrimaryCharacter(userId)
             if (selectedCharacter) {
                 characterId = selectedCharacter.id
             }
         }
         
         if (!selectedCharacter) {
-            selectedCharacter = characterManager.createCharacter(userId, 'My Character')
-            selectedCharacter.isPrimary = true
+            selectedCharacter = await characterManager.createCharacter(userId, 'My Character', socket.user.shape, socket.user.color)
+            await characterManager.setPrimaryCharacter(userId, selectedCharacter.id)
             characterId = selectedCharacter.id
         }
         
@@ -648,14 +704,20 @@ combatSystem.configure({
 // Socket.IO connection handling
 io.on('connection', async (socket) => {
     const username = socket.user.username
+    const userId = socket.user.id
+    const connectedAt = Date.now()
+    socket.connectedAt = connectedAt
     console.log(`${username} connected`)
 
+    // Track socket by userId for force-disconnect (with connection time)
+    userSockets.set(userId, { socket, connectedAt })
+
     socket.emit('welcome', `Connection established.`)
-    socket.emit('yourPlayerId', socket.user.id)
+    socket.emit('yourPlayerId', userId)
     
     // Send user's characters list
-    const characters = characterManager.getUserCharacters(socket.user.id, socket.user.shape, socket.user.color)
-    const selectedId = userSelectedCharacters.get(socket.user.id)
+    const characters = await characterManager.getUserCharacters(userId, socket.user.shape, socket.user.color)
+    const selectedId = userSelectedCharacters.get(userId)
     socket.emit('userCharacters', characters.map(c => ({
         id: c.id,
         name: c.name,
@@ -680,6 +742,12 @@ io.on('connection', async (socket) => {
     socket.on('disconnect', () => {
         console.log(`${username} disconnected`)
         
+        // Remove from userSockets (only if it's this socket)
+        const entry = userSockets.get(userId)
+        if (entry && entry.socket === socket) {
+            userSockets.delete(userId)
+        }
+        
         // Get room/party info before removing
         const roomId = playerToRoom.get(socket)
         const partyId = playerToParty.get(socket)
@@ -692,21 +760,38 @@ io.on('connection', async (socket) => {
     })
 
     socket.on('sendGlobalUserMessage', (message) => {
-        const partyId = playerToParty.get(socket)
-        const isInHub = hubWorldPlayers.has(socket)
+        // Global chat - always broadcast to ALL hub world players
+        // This works regardless of party status
+        hubWorldPlayers.forEach(hubSocket => {
+            hubSocket.emit('receiveGlobalMessage', message, socket.user.id, socket.user.username)
+        })
         
+        // Also send to party members who might be in dungeon
+        const partyId = playerToParty.get(socket)
         if (partyId) {
-            // Send to party members (in dungeon)
             const party = parties.get(partyId)
             if (party) {
                 party.members.forEach(member => {
-                    member.emit('recieveGlobalUserMessage', message, socket.user.id, socket.user.username)
+                    // Don't double-send to hub players
+                    if (!hubWorldPlayers.has(member)) {
+                        member.emit('receiveGlobalMessage', message, socket.user.id, socket.user.username)
+                    }
                 })
             }
-        } else if (isInHub) {
-            // Send to all hub world players
-            hubWorldPlayers.forEach(hubSocket => {
-                hubSocket.emit('recieveGlobalUserMessage', message, socket.user.id, socket.user.username)
+        }
+    })
+    
+    socket.on('sendPartyMessage', (message) => {
+        const partyId = playerToParty.get(socket)
+        if (!partyId) {
+            socket.emit('chatError', { message: 'You are not in a party' })
+            return
+        }
+        
+        const party = parties.get(partyId)
+        if (party) {
+            party.members.forEach(member => {
+                member.emit('receivePartyMessage', message, socket.user.id, socket.user.username)
             })
         }
     })
@@ -716,8 +801,8 @@ io.on('connection', async (socket) => {
     })
     
     // Character Management Handlers
-    socket.on('getUserCharacters', () => {
-        const characters = characterManager.getUserCharacters(socket.user.id, socket.user.shape, socket.user.color)
+    socket.on('getUserCharacters', async () => {
+        const characters = await characterManager.getUserCharacters(socket.user.id, socket.user.shape, socket.user.color)
         const selectedId = userSelectedCharacters.get(socket.user.id)
         socket.emit('userCharacters', characters.map(c => ({
             id: c.id,
@@ -735,15 +820,14 @@ io.on('connection', async (socket) => {
         socket.emit('currentCharacterId', selectedId)
     })
     
-    socket.on('createCharacter', (data) => {
+    socket.on('createCharacter', async (data) => {
         try {
             const { name, shape, color } = data
-            const colorNum = color ? parseInt(color.replace('#', ''), 16) : 0x00ff00
-            const character = characterManager.createCharacter(
+            const character = await characterManager.createCharacter(
                 socket.user.id,
                 name || 'New Character',
                 shape || 'cube',
-                colorNum
+                color || '#00ff00'
             )
             socket.emit('characterCreated', {
                 success: true,
@@ -757,7 +841,7 @@ io.on('connection', async (socket) => {
             })
             
             // Refresh character list
-            const characters = characterManager.getUserCharacters(socket.user.id, socket.user.shape, socket.user.color)
+            const characters = await characterManager.getUserCharacters(socket.user.id, socket.user.shape, socket.user.color)
             const selectedId = userSelectedCharacters.get(socket.user.id)
             socket.emit('userCharacters', characters.map(c => ({
                 id: c.id,
@@ -779,7 +863,7 @@ io.on('connection', async (socket) => {
     })
     
     socket.on('selectCharacter', async (characterId) => {
-        const character = characterManager.getCharacter(socket.user.id, characterId)
+        const character = await characterManager.getCharacter(socket.user.id, characterId)
         if (!character) {
             socket.emit('characterSelected', { success: false, error: 'Character not found' })
             return
@@ -827,7 +911,7 @@ io.on('connection', async (socket) => {
         }
         
         // Refresh character list for this player
-        const characters = characterManager.getUserCharacters(socket.user.id, socket.user.shape, socket.user.color)
+        const characters = await characterManager.getUserCharacters(socket.user.id, socket.user.shape, socket.user.color)
         const selectedId = userSelectedCharacters.get(socket.user.id)
         socket.emit('userCharacters', characters.map(c => ({
             id: c.id,
@@ -847,13 +931,13 @@ io.on('connection', async (socket) => {
         socket.emit('characterSelected', { success: true, characterId })
     })
     
-    socket.on('setPrimaryCharacter', (characterId) => {
-        const success = characterManager.setPrimaryCharacter(socket.user.id, characterId)
+    socket.on('setPrimaryCharacter', async (characterId) => {
+        const success = await characterManager.setPrimaryCharacter(socket.user.id, characterId)
         if (success) {
             socket.emit('primaryCharacterSet', { success: true, characterId })
             
             // Refresh character list
-            const characters = characterManager.getUserCharacters(socket.user.id, socket.user.shape, socket.user.color)
+            const characters = await characterManager.getUserCharacters(socket.user.id, socket.user.shape, socket.user.color)
             const selectedId = userSelectedCharacters.get(socket.user.id)
             socket.emit('userCharacters', characters.map(c => ({
                 id: c.id,
@@ -874,16 +958,16 @@ io.on('connection', async (socket) => {
         }
     })
     
-    socket.on('deleteCharacter', (characterId) => {
+    socket.on('deleteCharacter', async (characterId) => {
         try {
-            const success = characterManager.deleteCharacter(socket.user.id, characterId)
+            const success = await characterManager.deleteCharacter(socket.user.id, characterId)
             if (success) {
                 socket.emit('characterDeleted', { success: true, characterId })
                 
                 // If deleted character was selected, switch to first available
                 let selectedId = userSelectedCharacters.get(socket.user.id)
                 if (selectedId === characterId) {
-                    const remainingCharacters = characterManager.getUserCharacters(socket.user.id, socket.user.shape, socket.user.color)
+                    const remainingCharacters = await characterManager.getUserCharacters(socket.user.id, socket.user.shape, socket.user.color)
                     if (remainingCharacters.length > 0) {
                         // Will switch on next connection or manual selection
                         userSelectedCharacters.delete(socket.user.id)
@@ -892,7 +976,7 @@ io.on('connection', async (socket) => {
                 }
                 
                 // Refresh character list
-                const characters = characterManager.getUserCharacters(socket.user.id, socket.user.shape, socket.user.color)
+                const characters = await characterManager.getUserCharacters(socket.user.id, socket.user.shape, socket.user.color)
                 if (selectedId === null || selectedId === characterId) {
                     selectedId = userSelectedCharacters.get(socket.user.id) || null
                 }
@@ -1167,6 +1251,61 @@ setInterval(() => {
         }
     })
 }, 2000)
+
+// Poll Profile API for kicked users and disconnect them
+const checkKickedUsers = async () => {
+    if (userSockets.size === 0) return
+    
+    try {
+        const userIds = Array.from(userSockets.keys())
+        const response = await fetch(`${SHIP.PROFILE_API}/api/kicked-users/check`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ userIds })
+        })
+        
+        if (response.ok) {
+            const { kicked } = await response.json()
+            if (kicked.length > 0) {
+                console.log(`[Game Server] Received kicked users:`, kicked)
+            }
+            for (const { userId, reason, kickedAt } of kicked) {
+                const entry = userSockets.get(userId) || userSockets.get(Number(userId)) || userSockets.get(String(userId))
+                if (entry) {
+                    const { socket, connectedAt } = entry
+                    
+                    // Only disconnect if this socket was connected BEFORE the kick happened
+                    // This prevents kicking a user who just reconnected with a new session
+                    if (kickedAt && connectedAt > kickedAt) {
+                        console.log(`[Game Server] Skipping kick for user ${userId} - socket connected after kick (connected: ${connectedAt}, kicked: ${kickedAt})`)
+                        continue
+                    }
+                    
+                    console.log(`[Game Server] Force disconnecting user ${userId}: ${reason}`)
+                    socket.emit('forceDisconnect', { reason: 'Your session was terminated from another device.' })
+                    
+                    // Clean up before disconnect
+                    playerMonitor.broadcastToArea(socket, 'playerLeft', { id: userId }, false)
+                    partyManager.leaveParty(socket)
+                    playerMonitor.removeFromPlayerMap(socket)
+                    userSockets.delete(userId)
+                    userSockets.delete(Number(userId))
+                    userSockets.delete(String(userId))
+                    
+                    // Disconnect the socket
+                    socket.disconnect(true)
+                } else {
+                    console.log(`[Game Server] Could not find socket for kicked user ${userId}, available:`, Array.from(userSockets.keys()))
+                }
+            }
+        }
+    } catch (error) {
+        // Silently fail - Profile API might be unavailable
+    }
+}
+
+// Check for kicked users every 3 seconds
+setInterval(checkKickedUsers, 3000)
 
 // Initialize server
 async function initializeServer() {

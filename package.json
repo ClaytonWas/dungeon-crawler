@@ -20,9 +20,9 @@
     "test:server": "npm run test:backend",
     "test:client": "npm run test:profile-api"
   },
-  "keywords": ["dungeon", "crawler", "multiplayer", "game"],
-  "author": "",
-  "license": "ISC",
+  "keywords": ["dungeon", "crawler", "multiplayer", "game", "mmo", "socket.io", "three.js", "react", "boilerplate"],
+  "author": "ClaytonWas",
+  "license": "MIT",
   "devDependencies": {
     "jest": "^29.7.0",
     "@playwright/test": "^1.48.2"

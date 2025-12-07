@@ -2,8 +2,8 @@ import { useState } from 'react'
 import { useGameStore } from '../../stores/gameStore'
 import toast from 'react-hot-toast'
 
-// Profile server URL (different port from game client)
-const PROFILE_SERVER_URL = import.meta.env.VITE_PROFILE_SERVER_URL || 'http://localhost:3000'
+// Profile server URL - always use current hostname for LAN compatibility
+const PROFILE_SERVER_URL = `${window.location.protocol}//${window.location.hostname}:3000`
 
 export default function AccountTab() {
   const { socket, characters, currentCharacterId, inDungeon } = useGameStore()

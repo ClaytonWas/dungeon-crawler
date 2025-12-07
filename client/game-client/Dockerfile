@@ -11,11 +11,7 @@ RUN npm install
 # Copy source code
 COPY . .
 
-# Build-time environment variables
-ARG VITE_PROFILE_SERVER_URL=http://localhost:3000
-ENV VITE_PROFILE_SERVER_URL=$VITE_PROFILE_SERVER_URL
-
-# Build the app
+# Build the app (URLs are determined dynamically at runtime via window.location.hostname)
 RUN npm run build
 
 # Production image

@@ -1,62 +1,135 @@
-# 🎮 Dungeon Crawler MMO Boilerplate
+<div align="center">
 
-A production-ready MMO boilerplate with **Vampire Survivors-style combat**, real-time multiplayer, and instanced dungeons. Built with Node.js, Socket.IO, Three.js, and React.
+# 🎮 Dungeon Crawler MMO
 
-**⭐ Fork this repository to start building your own MMO game!**
+### A Production-Ready Multiplayer Game Boilerplate
+
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+[![Node.js](https://img.shields.io/badge/Node.js-20+-green.svg)](https://nodejs.org/)
+[![Docker](https://img.shields.io/badge/Docker-Ready-blue.svg)](https://www.docker.com/)
+[![Socket.IO](https://img.shields.io/badge/Socket.IO-4.x-black.svg)](https://socket.io/)
+[![Three.js](https://img.shields.io/badge/Three.js-3D-orange.svg)](https://threejs.org/)
+[![React](https://img.shields.io/badge/React-18-61DAFB.svg)](https://reactjs.org/)
+
+**Build your own MMO with Vampire Survivors-style combat, real-time multiplayer, and instanced dungeons.**
+
+[Quick Start](#-quick-start) • [Documentation](#-documentation) • [Features](#-features) • [Contributing](#-contributing)
+
+<img src="https://img.shields.io/badge/Status-Active_Development-brightgreen" alt="Status">
+
+</div>
 
 ---
 
-## ✨ What's Included
+## 🎯 What is this?
 
-### Core Systems (Ready to Use)
-- ⚔️ **Auto-targeting Combat** - Radius-based attacks, piercing, upgrade system
-- 🌍 **Hub + Instanced Dungeons** - Social spaces and party-based instances
-- 💥 **Party System** - Create/join parties with leader controls
-- 💬 **Real-time Chat** - Hub chat, party chat, floating speech bubbles
-- 🎭 **Multi-character System** - Up to 5 characters per account
-- 📈 **Progression** - Character leveling, in-match upgrades, account unlocks
-- 🗡️ **Weapon System** - Extensible weapon definitions with upgrade paths
-- 🔐 **Play Ticket Auth** - Session-backed, short-lived ticket validation
+This is a **fully-featured MMO game boilerplate** designed as a foundation for building multiplayer games. It includes complete implementations of core MMO systems that would typically take months to build from scratch.
 
-### Technical Stack
-- **Frontend**: React + Three.js + Tailwind CSS
-- **Backend**: Node.js + Express + Socket.IO
-- **Database**: SQLite (easily swappable)
-- **Deployment**: Docker Compose (4 services)
-- **Architecture**: MMO-style state sync with server authority
+**Perfect for:**
+- 🎮 Game developers wanting a multiplayer foundation
+- 📚 Developers learning real-time game architecture
+- 🚀 Startups prototyping multiplayer game ideas
+- 🔧 Anyone interested in Socket.IO/WebSocket game patterns
+
+---
+
+## ✨ Features
+
+<table>
+<tr>
+<td width="50%">
+
+### 🎮 Core Gameplay
+- ⚔️ **Vampire Survivors Combat** - Auto-targeting, radius-based attacks, piercing, upgrades
+- 🌍 **Persistent Hub World** - Social hub where all players gather
+- 🏰 **Instanced Dungeons** - Party-based dungeon runs
+- 👥 **Party System** - Create/join parties, party-only chat
+- 💬 **Tabbed Chat System** - Global and party chat
+- 🎭 **Multiple Characters** - Up to 5 characters per account
+
+</td>
+<td width="50%">
+
+### 📈 Progression Systems
+- 📊 **Character Leveling** - Persistent XP, levels, kills, deaths
+- ⚡ **In-Match Upgrades** - Temporary buffs that reset after dungeon
+- 🔓 **Account Upgrades** - Permanent unlocks and stat boosts
+- 🗡️ **Weapon System** - Multiple weapon types with upgrade paths
+- 💎 **Loot Drops** - Enemy drops (foundation ready for item system)
+
+</td>
+</tr>
+<tr>
+<td width="50%">
+
+### 🔒 Security & Auth
+- 🔐 **Session Management** - Database-backed with view/terminate
+- 🚫 **Concurrent Login Prevention** - Blocks duplicate sessions
+- ⚡ **Force Login** - Option to kick existing session
+- 🔑 **Secure Password Change** - With current password verification
+- 🎫 **Play Ticket Auth** - Short-lived tokens for game server
+
+</td>
+<td width="50%">
+
+### ⚙️ Technical Features
+- 🔄 **Real-time State Sync** - MMO-style concurrent updates
+- 🎨 **Modern UI** - React + Tailwind CSS dark theme
+- 🎮 **3D Graphics** - Three.js with camera controls
+- 🐳 **Docker Deployment** - Multi-service containerized
+- 🌐 **LAN Support** - Auto-detects hostname for local play
+
+</td>
+</tr>
+</table>
+
+---
+
+## 🛠️ Tech Stack
+
+| Layer | Technologies |
+|-------|-------------|
+| **Frontend** | React 18, Three.js, Tailwind CSS, Vite, Zustand |
+| **Backend** | Node.js, Express, Socket.IO |
+| **Database** | SQLite (easily swappable to PostgreSQL/MongoDB) |
+| **DevOps** | Docker, Docker Compose, Jest, Playwright |
+| **Architecture** | MMO-style state sync with server authority |
 
 ---
 
 ## 🏗️ Architecture
 
 ```
-┌─────────────┬─────────────┬─────────────┬──────────────────────┐
-│ Profile     │ Profile     │ Game Server │ Game Client          │
-│ Client      │ API         │             │ (React/Three.js)     │
-│ (React)     │ (Express)   │ (Socket.IO) │                      │
-│ Port: 3000  │ Port: 3001  │ Port: 3030  │ Port: 5173           │
-│ ─────────   │ ─────────   │ ─────────   │ ─────────            │
-│ • Login UI  │ • Auth API  │ • Gameplay  │ • 3D Rendering       │
-│ • Register  │ • Sessions  │ • Combat    │ • Game UI            │
-│ • Dashboard │ • SQLite    │ • Parties   │ • Socket Client      │
-└─────────────┴─────────────┴─────────────┴──────────────────────┘
+┌────────────────────────────────────────────────────────────────────────────┐
+│                              DUNGEON CRAWLER MMO                           │
+├─────────────┬─────────────┬─────────────┬──────────────────────────────────┤
+│   Profile   │   Profile   │    Game     │          Game Client             │
+│   Client    │    API      │   Server    │       (React/Three.js)           │
+│   (React)   │  (Express)  │ (Socket.IO) │                                  │
+│  Port 3000  │  Port 3001  │  Port 3030  │          Port 5173               │
+├─────────────┼─────────────┼─────────────┼──────────────────────────────────┤
+│ • Login UI  │ • Auth API  │ • Gameplay  │ • 3D Rendering                   │
+│ • Register  │ • Sessions  │ • Combat    │ • Real-time Game UI              │
+│ • Dashboard │ • SQLite DB │ • Parties   │ • WebSocket Client               │
+└─────────────┴─────────────┴─────────────┴──────────────────────────────────┘
 ```
 
-**See [ARCHITECTURE.md](ARCHITECTURE.md) for complete system design.**
+> 📖 **[View Full Architecture Documentation →](ARCHITECTURE.md)** (850+ lines of detailed system design)
 
 ---
 
 ## 🚀 Quick Start
 
 ### Prerequisites
-- Docker & Docker Compose
-- Node.js 20+
 
-### Run with Docker (Recommended)
+- [Docker](https://www.docker.com/get-started) & Docker Compose
+- [Node.js](https://nodejs.org/) 20+ (for local development)
+
+### Option 1: Docker (Recommended)
 
 ```bash
 # Clone the repository
-git clone <your-fork-url>
+git clone https://github.com/ClaytonWas/dungeon-crawler.git
 cd dungeon-crawler
 
 # Start all services
@@ -67,18 +140,18 @@ docker-compose up
 # Game Client: http://localhost:5173
 ```
 
-### Local Development
+### Option 2: Local Development
 
 ```bash
-# Terminal 1 - Profile Server
+# Terminal 1 - Profile Server (Auth API)
 cd client
 npm install && npm start
 
-# Terminal 2 - Game Server
+# Terminal 2 - Game Server (Socket.IO)
 cd server
 npm install && npm start
 
-# Terminal 3 - Game Client
+# Terminal 3 - Game Client (Vite + React)
 cd client/game-client
 npm install && npm run dev
 ```
@@ -87,30 +160,38 @@ npm install && npm run dev
 
 ## 📖 Documentation
 
-| Guide | Purpose |
-|-------|---------|
-| **[ARCHITECTURE.md](ARCHITECTURE.md)** | System design & data flow (850+ lines) |
-| **[CONTRIBUTING.md](CONTRIBUTING.md)** | Development workflow (670+ lines) |
-| **[WORLD_CREATION_GUIDE.md](WORLD_CREATION_GUIDE.md)** | Build game worlds (450+ lines) |
-| **[WEAPON_GUIDE.md](WEAPON_GUIDE.md)** | Create weapons (400+ lines) |
-| **[CHARACTER_GUIDE.md](CHARACTER_GUIDE.md)** | Character systems (450+ lines) |
-| **[SCENE_QUICK_START.md](SCENE_QUICK_START.md)** | Scene schema reference (390+ lines) |
-| **[TESTING_GUIDE.md](TESTING_GUIDE.md)** | Testing & CI/CD (900+ lines) |
+This project includes **4,700+ lines** of comprehensive documentation:
 
-**Total**: 4,700+ lines of comprehensive documentation
+| Guide | Description |
+|-------|-------------|
+| 📐 **[ARCHITECTURE.md](ARCHITECTURE.md)** | Complete system design, data flow, and component interactions |
+| 🤝 **[CONTRIBUTING.md](CONTRIBUTING.md)** | Development workflow, code standards, and PR guidelines |
+| 🌍 **[WORLD_CREATION_GUIDE.md](WORLD_CREATION_GUIDE.md)** | Create custom game worlds with JSON schemas |
+| ⚔️ **[WEAPON_GUIDE.md](WEAPON_GUIDE.md)** | Design and implement new weapon systems |
+| 👤 **[CHARACTER_GUIDE.md](CHARACTER_GUIDE.md)** | Character creation, stats, and progression |
+| 🎬 **[SCENE_QUICK_START.md](SCENE_QUICK_START.md)** | Quick reference for scene configuration |
+| 🧪 **[TESTING_GUIDE.md](TESTING_GUIDE.md)** | Testing strategies, Jest, and Playwright setup |
 
 ---
 
 ## 🎯 Quick Examples
 
-### Create a New World
+<details>
+<summary><b>🌍 Create a New World</b></summary>
+
 ```bash
+# Create a new scene file
 cd server/scenes
 touch my_dungeon.json
-# Edit JSON (hot-reload, no rebuild needed)
 ```
 
-### Add a New Weapon
+Scene files support hot-reload — no rebuild needed!
+
+</details>
+
+<details>
+<summary><b>⚔️ Add a New Weapon</b></summary>
+
 ```javascript
 // server/systems/weaponDefinitions.js
 myWeapon: {
@@ -127,103 +208,118 @@ myWeapon: {
 }
 ```
 
-**See [WEAPON_GUIDE.md](WEAPON_GUIDE.md) for complete details.**
+> 📖 See **[WEAPON_GUIDE.md](WEAPON_GUIDE.md)** for complete weapon creation docs.
+
+</details>
+
+<details>
+<summary><b>🎨 Customize the UI Theme</b></summary>
+
+Edit `client/game-client/tailwind.config.js` to customize colors, fonts, and spacing.
+
+</details>
 
 ---
 
-## 🛠️ Customization Guide
 
-### Replace Placeholder Content
-
-1. **Game Assets**: Replace Three.js geometries in `client/game-client/src/utils/SceneLoader.js`
-2. **UI Theme**: Edit Tailwind config in `client/game-client/tailwind.config.js`
-3. **Game Balance**: Modify `server/systems/weaponDefinitions.js` and `characterUpgrades.js`
-4. **World Design**: Edit JSON files in `server/scenes/`
-5. **Database**: Swap SQLite for PostgreSQL/MongoDB in `client/apiServer.js`
-
-### Extend Core Systems
-
-- **New Weapon Types**: Follow [WEAPON_GUIDE.md](WEAPON_GUIDE.md)
-- **New Enemy Types**: Modify `server/gameServer.js` enemy spawning logic
-- **New Progression**: Edit `server/systems/accountUpgrades.js`
-- **New Scenes**: Follow [WORLD_CREATION_GUIDE.md](WORLD_CREATION_GUIDE.md)
-
----
-
-## 🗂️ Directory Structure
+## 📁 Project Structure
 
 ```
 dungeon-crawler/
-├── client/
-│   ├── profile-client/          # Login/register UI
-│   ├── game-client/             # Game UI + Three.js
-│   ├── apiServer.js             # Auth API
-│   └── db/                      # SQLite database
-├── server/
-│   ├── gameServer.js            # Main game logic
-│   ├── systems/                 # Weapons, upgrades, characters
-│   └── scenes/                  # World JSON definitions
-├── docker-compose.yaml          # 4-service orchestration
-└── Documentation/               # 4,700+ lines of guides
+├── 📁 client/
+│   ├── 📁 profile-client/       # Login/Register UI (React + Vite)
+│   ├── 📁 game-client/          # Game UI + Three.js rendering
+│   ├── 📄 apiServer.js          # Auth API (Express)
+│   └── 📁 db/                   # SQLite database & schemas
+│
+├── 📁 server/
+│   ├── 📄 gameServer.js         # Main game logic (Socket.IO)
+│   ├── 📁 systems/              # Combat, weapons, characters, upgrades
+│   └── 📁 scenes/               # World definitions (JSON)
+│
+├── 📄 docker-compose.yaml       # 4-service orchestration
+└── 📚 Documentation             # 4,700+ lines of guides
 ```
 
 ---
 
-## ⚡ Key Features
+## 🧪 Testing
 
-| Feature | Description | Config File |
-|---------|-------------|-------------|
-| **Combat** | Auto-attack, radius targeting, piercing | `weaponDefinitions.js` |
-| **Worlds** | JSON-based, hot-reload | `server/scenes/*.json` |
-| **Progression** | XP, levels, upgrades | `characterUpgrades.js`, `accountUpgrades.js` |
-| **Parties** | Create/join, leader controls | `gameServer.js` |
-| **Characters** | 5 per account, persistent | `characterManager.js` |
+```bash
+# Run all tests
+npm test
+
+# Backend tests only
+npm run test:backend
+
+# Frontend tests
+npm run test:frontend
+
+# E2E tests with Playwright
+npm run test:e2e
+
+# Coverage report
+npm run test:coverage
+```
 
 ---
 
 ## 🤝 Contributing
 
-This is a **template repository**. Fork it and build your own game!
+Contributions are welcome! This is a template repository — fork it to build your own game, or contribute improvements to the boilerplate.
 
-If you want to contribute improvements to the boilerplate itself:
-1. Read [CONTRIBUTING.md](CONTRIBUTING.md)
-2. Create a feature branch
-3. Submit a pull request
+1. Fork the repository
+2. Create a feature branch (`git checkout -b feature/amazing-feature`)
+3. Commit your changes (`git commit -m 'Add amazing feature'`)
+4. Push to the branch (`git push origin feature/amazing-feature`)
+5. Open a Pull Request
+
+> 📖 See **[CONTRIBUTING.md](CONTRIBUTING.md)** for detailed guidelines.
 
 ---
 
 ## 📋 Production Checklist
 
-Before deploying to production, consider:
+<details>
+<summary><b>View production readiness checklist</b></summary>
+
+Before deploying to production:
 
 - [ ] Replace SQLite with PostgreSQL/MongoDB
 - [ ] Add input validation (Zod schemas)
 - [ ] Implement rate limiting
 - [ ] Add comprehensive error handling
 - [ ] Set up logging (Winston/Pino)
-- [ ] Write unit tests (Jest)
 - [ ] Configure CORS properly
 - [ ] Use environment variables for secrets
 - [ ] Set up Redis for shared state
 - [ ] Implement anti-cheat measures
+- [ ] Add monitoring and alerting
 
-**See [TESTING_GUIDE.md](TESTING_GUIDE.md) for testing strategies.**
+> 📖 See **[TESTING_GUIDE.md](TESTING_GUIDE.md)** for testing strategies.
+
+</details>
 
 ---
 
 ## 📄 License
 
-MIT License - Fork freely and build amazing games!
+This project is licensed under the **MIT License** — see the [LICENSE](LICENSE) file for details.
+
+You are free to use this boilerplate for personal and commercial projects.
 
 ---
 
-## 🚀 Start Building
+<div align="center">
 
-1. **Fork this repository**
-2. **Read [ARCHITECTURE.md](ARCHITECTURE.md)** to understand the systems
-3. **Choose your focus**: Worlds, weapons, characters, or core systems
-4. **Build your game!**
+## 🚀 Ready to Build Your Game?
 
-**Questions?** Check the documentation guides or open an issue.
+**Fork this repository and start building!**
 
-**⭐ If this boilerplate helped you, give it a star!**
+[![GitHub stars](https://img.shields.io/github/stars/ClaytonWas/dungeon-crawler?style=social)](https://github.com/ClaytonWas/dungeon-crawler)
+
+---
+
+Made with ❤️ for the game dev community
+
+</div>

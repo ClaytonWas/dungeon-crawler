@@ -3,7 +3,10 @@ import { io } from 'socket.io-client'
 import { useGameStore } from '../stores/gameStore'
 import toast from 'react-hot-toast'
 
-const GAME_SERVER_URL = import.meta.env.VITE_GAME_SERVER_URL || 'http://localhost:3030'
+// Dynamically determine game server URL based on current browser location
+// This allows the same build to work on localhost AND LAN
+// Always use current hostname - this ensures LAN clients connect to the right server
+const GAME_SERVER_URL = `${window.location.protocol}//${window.location.hostname}:3030`
 
 export function useSocket(ticket, onTicketInvalid) {
   const store = useGameStore()
@@ -25,6 +28,18 @@ export function useSocket(ticket, onTicketInvalid) {
     socket.on('disconnect', () => {
       store.setConnected(false)
       console.log('Disconnected from game server')
+    })
+    
+    // Handle force disconnect (kicked by another session)
+    socket.on('forceDisconnect', ({ reason }) => {
+      console.log('Force disconnected:', reason)
+      toast.error(reason || 'You have been disconnected.')
+      // Clear stored character so we get fresh data on reconnect
+      localStorage.removeItem('selectedCharacterId')
+      // Redirect to profile page
+      setTimeout(() => {
+        window.location.href = `${window.location.protocol}//${window.location.hostname}:3000`
+      }, 2000)
     })
     
     socket.on('connect_error', (err) => {
@@ -169,6 +184,8 @@ export function useSocket(ticket, onTicketInvalid) {
     })
     
     socket.on('playerMoved', (data) => {
+      // Always update store with server position for ALL players
+      // This keeps positions in sync - the client-side rendering handles smooth interpolation
       store.updatePlayer(data.id, { position: data.position })
     })
     
@@ -299,14 +316,36 @@ export function useSocket(ticket, onTicketInvalid) {
       toast.success(`Level Up! Now level ${data.newLevel}`)
     })
     
-    // Chat
-    socket.on('recieveGlobalUserMessage', (message, id, username) => {
-      store.addMessage({ id, username, message, timestamp: Date.now() })
+    // Chat - Global channel
+    socket.on('receiveGlobalMessage', (message, id, username) => {
+      store.addGlobalMessage({ id, username, message, timestamp: Date.now(), channel: 'global' })
       
       // Add chat bubble above player's head
       store.addChatBubble(id, message)
       
       // Remove chat bubble after 5 seconds
+      setTimeout(() => {
+        store.removeChatBubble(id)
+      }, 5000)
+    })
+    
+    // Chat - Party channel
+    socket.on('receivePartyMessage', (message, id, username) => {
+      store.addPartyMessage({ id, username, message, timestamp: Date.now(), channel: 'party' })
+      
+      // Add chat bubble above player's head
+      store.addChatBubble(id, message)
+      
+      // Remove chat bubble after 5 seconds
+      setTimeout(() => {
+        store.removeChatBubble(id)
+      }, 5000)
+    })
+    
+    // Legacy support for old message format
+    socket.on('recieveGlobalUserMessage', (message, id, username) => {
+      store.addGlobalMessage({ id, username, message, timestamp: Date.now(), channel: 'global' })
+      store.addChatBubble(id, message)
       setTimeout(() => {
         store.removeChatBubble(id)
       }, 5000)

@@ -41,8 +41,8 @@ services:
   game:
     build:
       context: ./client/game-client
-      args:
-        - VITE_PROFILE_SERVER_URL=http://localhost:3000
+      # URLs are determined dynamically at runtime via window.location.hostname
+      # This allows the same build to work on localhost and LAN
     ports:
       - "5173:5173"
     depends_on:

@@ -28,8 +28,8 @@
       "density": 0.03
     },
     "ambient": {
-      "color": "0x404040",
-      "intensity": 0.4
+      "color": "0x4a4a4a",
+      "intensity": 0.65
     }
   },
   "lights": [
@@ -37,7 +37,7 @@
       "id": "dim-overhead",
       "type": "directional",
       "color": "0x8888bb",
-      "intensity": 0.6,
+      "intensity": 1.0,
       "position": [0, 10, 0],
       "target": [0, 0, 0]
     },
@@ -58,6 +58,42 @@
       "position": [0, 3, 18],
       "distance": 15,
       "decay": 2
+    },
+    {
+      "id": "sconce-left-1",
+      "type": "point",
+      "color": "0xffaa66",
+      "intensity": 1.2,
+      "position": [-15, 2.5, -5],
+      "distance": 12,
+      "decay": 1.5
+    },
+    {
+      "id": "sconce-right-1",
+      "type": "point",
+      "color": "0xffaa66",
+      "intensity": 1.2,
+      "position": [15, 2.5, -5],
+      "distance": 12,
+      "decay": 1.5
+    },
+    {
+      "id": "sconce-left-2",
+      "type": "point",
+      "color": "0xffaa66",
+      "intensity": 1.2,
+      "position": [-15, 2.5, 5],
+      "distance": 12,
+      "decay": 1.5
+    },
+    {
+      "id": "sconce-right-2",
+      "type": "point",
+      "color": "0xffaa66",
+      "intensity": 1.2,
+      "position": [15, 2.5, 5],
+      "distance": 12,
+      "decay": 1.5
     }
   ],
   "nodes": [
@@ -73,7 +109,7 @@
       },
       "material": {
         "type": "standard",
-        "color": "0x222222",
+        "color": "0xffffff",
         "roughness": 0.9
       },
       "transform": {
@@ -178,32 +214,48 @@
         "id": "spawn-group-1",
         "entityType": "enemy",
         "position": [0, 1, -10],
-        "count": 2,
-        "radius": 3,
+        "count": 3,
+        "radius": 4,
         "enabled": true
       },
       {
         "id": "spawn-group-2",
         "entityType": "enemy",
         "position": [-10, 1, 0],
-        "count": 2,
-        "radius": 3,
+        "count": 3,
+        "radius": 4,
         "enabled": true
       },
       {
         "id": "spawn-group-3",
         "entityType": "enemy",
         "position": [10, 1, 0],
-        "count": 2,
-        "radius": 3,
+        "count": 3,
+        "radius": 4,
         "enabled": true
       },
       {
         "id": "spawn-group-4",
         "entityType": "enemy",
         "position": [0, 1, 10],
+        "count": 4,
+        "radius": 4,
+        "enabled": true
+      },
+      {
+        "id": "spawn-group-5",
+        "entityType": "enemy",
+        "position": [-15, 1, 5],
         "count": 3,
-        "radius": 3,
+        "radius": 2.5,
+        "enabled": true
+      },
+      {
+        "id": "spawn-group-6",
+        "entityType": "enemy",
+        "position": [15, 1, -5],
+        "count": 3,
+        "radius": 2.5,
         "enabled": true
       }
     ]
