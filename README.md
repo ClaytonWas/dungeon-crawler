@@ -19,7 +19,6 @@
 
 </div>
 
----
 
 ## 🎯 What is this?
 
@@ -31,7 +30,6 @@ This is a **fully-featured MMO game boilerplate** designed as a foundation for b
 - 🚀 Startups prototyping multiplayer game ideas
 - 🔧 Anyone interested in Socket.IO/WebSocket game patterns
 
----
 
 ## ✨ Features
 
@@ -83,7 +81,6 @@ This is a **fully-featured MMO game boilerplate** designed as a foundation for b
 </tr>
 </table>
 
----
 
 ## 🛠️ Tech Stack
 
@@ -95,7 +92,6 @@ This is a **fully-featured MMO game boilerplate** designed as a foundation for b
 | **DevOps** | Docker, Docker Compose, Jest, Playwright |
 | **Architecture** | MMO-style state sync with server authority |
 
----
 
 ## 🏗️ Architecture
 
@@ -116,7 +112,6 @@ This is a **fully-featured MMO game boilerplate** designed as a foundation for b
 
 > 📖 **[View Full Architecture Documentation →](ARCHITECTURE.md)** (850+ lines of detailed system design)
 
----
 
 ## 🚀 Quick Start
 
@@ -156,7 +151,6 @@ cd client/game-client
 npm install && npm run dev
 ```
 
----
 
 ## 📖 Documentation
 
@@ -172,7 +166,6 @@ This project includes **4,700+ lines** of comprehensive documentation:
 | 🎬 **[SCENE_QUICK_START.md](SCENE_QUICK_START.md)** | Quick reference for scene configuration |
 | 🧪 **[TESTING_GUIDE.md](TESTING_GUIDE.md)** | Testing strategies, Jest, and Playwright setup |
 
----
 
 ## 🎯 Quick Examples
 
@@ -219,8 +212,6 @@ Edit `client/game-client/tailwind.config.js` to customize colors, fonts, and spa
 
 </details>
 
----
-
 
 ## 📁 Project Structure
 
@@ -241,7 +232,6 @@ dungeon-crawler/
 └── 📚 Documentation             # 4,700+ lines of guides
 ```
 
----
 
 ## 🧪 Testing
 
@@ -262,8 +252,6 @@ npm run test:e2e
 npm run test:coverage
 ```
 
----
-
 ## 🤝 Contributing
 
 Contributions are welcome! This is a template repository — fork it to build your own game, or contribute improvements to the boilerplate.
@@ -276,7 +264,6 @@ Contributions are welcome! This is a template repository — fork it to build yo
 
 > 📖 See **[CONTRIBUTING.md](CONTRIBUTING.md)** for detailed guidelines.
 
----
 
 ## 📋 Production Checklist
 
@@ -300,7 +287,6 @@ Before deploying to production:
 
 </details>
 
----
 
 ## 📄 License
 
@@ -308,18 +294,4 @@ This project is licensed under the **MIT License** — see the [LICENSE](LICENSE
 
 You are free to use this boilerplate for personal and commercial projects.
 
----
 
-<div align="center">
-
-## 🚀 Ready to Build Your Game?
-
-**Fork this repository and start building!**
-
-[![GitHub stars](https://img.shields.io/github/stars/ClaytonWas/dungeon-crawler?style=social)](https://github.com/ClaytonWas/dungeon-crawler)
-
----
-
-Made with ❤️ for the game dev community
-
-</div>
