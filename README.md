@@ -17,6 +17,10 @@
 
 <img src="https://img.shields.io/badge/Status-Active_Development-brightgreen" alt="Status">
 
+
+https://github.com/user-attachments/assets/7d3fece9-768f-4e75-bc8a-5e86c1740e10
+
+
 </div>
 
 
@@ -29,7 +33,6 @@ This is a **fully-featured MMO game boilerplate** designed as a foundation for b
 - 📚 Developers learning real-time game architecture
 - 🚀 Startups prototyping multiplayer game ideas
 - 🔧 Anyone interested in Socket.IO/WebSocket game patterns
-
 
 ## ✨ Features
 
