@@ -1069,11 +1069,25 @@ if (process.env.NODE_ENV !== 'test') {
 }
 
 // Cleanup on exit
-process.on('SIGTERM', () => {
+const gracefulShutdown = async (signal) => {
+    console.log(`[Profile API] Received ${signal}, cleaning up...`)
     clearInterval(sessionCleanupInterval)
     clearInterval(sessionDbCleanupInterval)
+    
+    // Clear all sessions on shutdown so users don't see "active session" on restart
+    try {
+        await dbRun(`DELETE FROM sessions`)
+        console.log('[Profile API] Cleared all sessions on shutdown')
+    } catch (err) {
+        console.error('[Profile API] Error clearing sessions:', err)
+    }
+    
     db.close()
-})
+    process.exit(0)
+}
+
+process.on('SIGTERM', () => gracefulShutdown('SIGTERM'))
+process.on('SIGINT', () => gracefulShutdown('SIGINT'))
 
 // Export for testing
 module.exports = app
