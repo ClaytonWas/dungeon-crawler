@@ -21,10 +21,11 @@ export default function GameCanvas() {
   const cameraPitchRef = useRef(0.5) // Vertical angle (pitch) - 0 to 1, 0.5 is middle
   const cameraDistanceRef = useRef(20) // For zoom
   const targetedEnemiesRef = useRef(new Set())
-  const playerTargetPositionsRef = useRef({}) // Track target positions for interpolation
-  const localPlayerPositionRef = useRef({ x: 0, y: 0.5, z: 0 }) // Local player ACTUAL position (no interpolation)
-  const pendingMovementRef = useRef({ x: 0, z: 0 }) // Movement to apply this frame
   const socketRef = useRef(null) // Socket ref for animation loop access
+  const sceneTransitionRef = useRef(false) // True when switching scenes - snap positions instead of interpolating
+  
+  // SIMPLE APPROACH: All positions come from the store. Period.
+  // The store is the single source of truth for ALL player positions.
   
   const { socket, playerId, players, enemies, inHubWorld, inDungeon, weaponStats, targetedEnemies, damageNumbers, removeDamageNumber, panelCollapsed, chatBubbles } = useGameStore()
   
@@ -94,8 +95,9 @@ export default function GameCanvas() {
       
       const currentPlayerId = useGameStore.getState().playerId
       const currentSocket = socketRef.current
+      const currentPlayers = useGameStore.getState().players
       
-      // Process local player movement FIRST (client-side prediction)
+      // Process keyboard input and send to server
       const keys = keysRef.current
       let dx = 0, dz = 0
       const moveSpeed = 0.15
@@ -116,35 +118,22 @@ export default function GameCanvas() {
         const moveX = dx * Math.cos(angle) + dz * Math.sin(angle)
         const moveZ = -dx * Math.sin(angle) + dz * Math.cos(angle)
         
-        // Update local position IMMEDIATELY (no interpolation for self)
-        localPlayerPositionRef.current.x += moveX * moveSpeed
-        localPlayerPositionRef.current.z += moveZ * moveSpeed
-        
-        // Send to server
+        // Just send to server - server will update position and broadcast back
         currentSocket.emit('updatePlayerPosition', {
           x: moveX * moveSpeed,
           z: moveZ * moveSpeed
         })
       }
       
-      // Update local player mesh DIRECTLY (no interpolation = no jitter)
-      if (currentPlayerId && playersRef.current[currentPlayerId]) {
-        const localMesh = playersRef.current[currentPlayerId]
-        localMesh.position.x = localPlayerPositionRef.current.x
-        localMesh.position.y = localPlayerPositionRef.current.y
-        localMesh.position.z = localPlayerPositionRef.current.z
-      }
-      
-      // Interpolate OTHER players (not self) toward their server positions
-      const interpolationSpeed = 0.2
+      // Update ALL player meshes from store positions (simple interpolation for smoothness)
+      const interpolationSpeed = 0.3
       Object.keys(playersRef.current).forEach(id => {
-        if (id === currentPlayerId) return // Skip local player
         const mesh = playersRef.current[id]
-        const targetPos = playerTargetPositionsRef.current[id]
-        if (mesh && targetPos) {
-          mesh.position.x += (targetPos.x - mesh.position.x) * interpolationSpeed
-          mesh.position.y += (targetPos.y - mesh.position.y) * interpolationSpeed
-          mesh.position.z += (targetPos.z - mesh.position.z) * interpolationSpeed
+        const playerData = currentPlayers[id]
+        if (mesh && playerData?.position) {
+          mesh.position.x += (playerData.position.x - mesh.position.x) * interpolationSpeed
+          mesh.position.y += (playerData.position.y - mesh.position.y) * interpolationSpeed
+          mesh.position.z += (playerData.position.z - mesh.position.z) * interpolationSpeed
         }
       })
       
@@ -232,6 +221,10 @@ export default function GameCanvas() {
     }
     
     loadSceneAsync()
+    
+    // Mark that we're in a scene transition - positions should snap, not interpolate
+    sceneTransitionRef.current = true
+    console.log('[GameCanvas] Scene transition started - will snap positions')
   }, [inHubWorld, inDungeon])
   
   // Handle pointer lock for camera control
@@ -342,7 +335,10 @@ export default function GameCanvas() {
           existingMesh.geometry.dispose()
           existingMesh.material.dispose()
           delete playersRef.current[id]
-          delete playerTargetPositionsRef.current[id]
+        } else if (player.position && sceneTransitionRef.current) {
+          // During scene transitions, snap all positions immediately
+          existingMesh.position.set(player.position.x, player.position.y, player.position.z)
+          console.log(`[GameCanvas] Snapped player ${id} to position during scene transition`)
         }
       }
       
@@ -357,63 +353,23 @@ export default function GameCanvas() {
         const mesh = new THREE.Mesh(geometry, material)
         mesh.castShadow = true
         mesh.userData.shape = shape
-        mesh.userData.isPlayer = true  // ← IMPORTANT: Mark as player so it's not cleared by SceneLoader!
-        const initialPos = {
-          x: player.position?.x || 0,
-          y: player.position?.y || 0.5,
-          z: player.position?.z || 0
-        }
-        mesh.position.set(initialPos.x, initialPos.y, initialPos.z)
+        mesh.userData.isPlayer = true
         
-        // For local player, initialize our authoritative position ref
-        if (id === currentPlayerId) {
-          localPlayerPositionRef.current = { ...initialPos }
-        }
-        // For other players, initialize target for interpolation
-        playerTargetPositionsRef.current[id] = { ...initialPos }
+        // Set initial position from server data
+        const pos = player.position || { x: 0, y: 0.5, z: 0 }
+        mesh.position.set(pos.x, pos.y, pos.z)
         
         scene.add(mesh)
         playersRef.current[id] = mesh
         console.log(`Created player mesh for ${id}:`, { shape, color: color.toString(16), position: player.position })
-      } else {
-        // Update positions based on server data
-        if (player.position) {
-          if (id === currentPlayerId) {
-            // For local player: smoothly reconcile with server to prevent drift
-            // Apply gradual correction toward server position
-            const localPos = localPlayerPositionRef.current
-            const serverPos = player.position
-            const dx = serverPos.x - localPos.x
-            const dz = serverPos.z - localPos.z
-            const drift = Math.sqrt(dx * dx + dz * dz)
-            
-            if (drift > 0.5) {
-              // Large drift - snap immediately (teleport/desync)
-              if (drift > 2) {
-                localPlayerPositionRef.current = { 
-                  x: serverPos.x, 
-                  y: serverPos.y, 
-                  z: serverPos.z 
-                }
-              } else {
-                // Medium drift - blend toward server position to correct over time
-                const correction = 0.1 // 10% correction per update
-                localPlayerPositionRef.current.x += dx * correction
-                localPlayerPositionRef.current.z += dz * correction
-              }
-            }
-            // Small drift (<0.5) - ignore, client prediction is close enough
-          } else {
-            // For other players, update their interpolation target
-            playerTargetPositionsRef.current[id] = { 
-              x: player.position.x, 
-              y: player.position.y, 
-              z: player.position.z 
-            }
-          }
-        }
       }
     })
+    
+    // Clear scene transition flag after processing all players
+    if (sceneTransitionRef.current) {
+      sceneTransitionRef.current = false
+      console.log('[GameCanvas] Scene transition complete - resuming interpolation')
+    }
     
     // Remove disconnected players
     Object.keys(playersRef.current).forEach(id => {
@@ -422,7 +378,6 @@ export default function GameCanvas() {
         playersRef.current[id].geometry.dispose()
         playersRef.current[id].material.dispose()
         delete playersRef.current[id]
-        delete playerTargetPositionsRef.current[id]
       }
     })
     

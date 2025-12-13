@@ -253,16 +253,43 @@ const partyManager = {
         party.members.delete(socket)
         playerToParty.delete(socket)
         
-        // Return to hub world if leaving party
+        // Return to hub world if leaving party (was in dungeon)
         if (roomId) {
             playerToRoom.delete(socket)
             hubWorldPlayers.add(socket)
+            
+            // Restore saved hub position or use origin as fallback
+            const player = playersInServer.get(socket.user.id)
+            if (player) {
+                if (player.savedHubPosition) {
+                    player.position = { ...player.savedHubPosition }
+                    console.log(`[PARTY] Restored hub position for ${socket.user.username}:`, player.position)
+                    delete player.savedHubPosition
+                } else {
+                    player.position = { x: 0, y: 0.5, z: 0 }
+                }
+            }
+            
             socket.emit('returnToHubWorld', {
+                position: player?.position,
                 playersInHub: Array.from(hubWorldPlayers).map(s => ({
                     id: s.user.id,
                     username: s.user.username
                 }))
             })
+            
+            // Send full hub state to returning player
+            playerMonitor.sendAreaState(socket)
+            
+            // Broadcast to other hub players that this player joined
+            const playerData = playerMonitor.getPlayerData(socket)
+            if (playerData) {
+                hubWorldPlayers.forEach(hubSocket => {
+                    if (hubSocket !== socket) {
+                        hubSocket.emit('playerJoined', playerData)
+                    }
+                })
+            }
         }
         
         // If leader left, assign new leader or disband
@@ -358,7 +385,15 @@ const partyManager = {
         party.roomId = roomId
         
         // BROADCAST: Tell hub players that these party members are leaving
+        // Also save each player's hub position before they enter the dungeon
         party.members.forEach(socket => {
+            // Save current hub position before entering dungeon
+            const player = playersInServer.get(socket.user.id)
+            if (player && player.position) {
+                player.savedHubPosition = { ...player.position }
+                console.log(`[DUNGEON] Saved hub position for ${socket.user.username}:`, player.savedHubPosition)
+            }
+            
             // Tell all OTHER hub players this player is leaving
             hubWorldPlayers.forEach(hubSocket => {
                 if (hubSocket !== socket) {

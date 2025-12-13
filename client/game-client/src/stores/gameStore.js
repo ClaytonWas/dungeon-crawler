@@ -44,6 +44,9 @@ export const useGameStore = create((set, get) => ({
   // UI state
   panelCollapsed: false,
   
+  // Force position reset (for scene transitions)
+  forcePosition: null,
+  
   // Actions
   setSocket: (socket) => set({ socket }),
   setConnected: (connected) => set({ connected }),
@@ -71,6 +74,8 @@ export const useGameStore = create((set, get) => ({
   
   setInHubWorld: (inHubWorld) => set({ inHubWorld, inDungeon: !inHubWorld }),
   setInDungeon: (inDungeon) => set({ inDungeon, inHubWorld: !inDungeon }),
+  setForcePosition: (position) => set({ forcePosition: position }),
+  clearForcePosition: () => set({ forcePosition: null }),
   
   setEnemies: (enemies) => set({ enemies }),
   updateEnemy: (enemyId, data) => set((state) => ({

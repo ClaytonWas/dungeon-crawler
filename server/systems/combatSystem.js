@@ -316,10 +316,17 @@ class CombatSystem {
 
             const player = playersInServer.get(member.user.id)
             if (player) {
-                player.position = { x: 0, y: 0.5, z: 0 }
+                // Restore saved hub position or use origin as fallback
+                if (player.savedHubPosition) {
+                    player.position = { ...player.savedHubPosition }
+                    console.log(`[DUNGEON] Restored hub position for ${member.user.username}:`, player.position)
+                    delete player.savedHubPosition // Clean up
+                } else {
+                    player.position = { x: 0, y: 0.5, z: 0 }
+                }
             }
 
-            member.emit('returnToHubWorld', { cleared: true })
+            member.emit('returnToHubWorld', { cleared: true, position: player?.position })
             playerMonitor?.sendAreaState(member)
 
             const playerData = playerMonitor?.getPlayerData(member)

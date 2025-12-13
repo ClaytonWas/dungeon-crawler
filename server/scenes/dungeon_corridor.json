@@ -225,38 +225,6 @@
         "count": 3,
         "radius": 4,
         "enabled": true
-      },
-      {
-        "id": "spawn-group-3",
-        "entityType": "enemy",
-        "position": [10, 1, 0],
-        "count": 3,
-        "radius": 4,
-        "enabled": true
-      },
-      {
-        "id": "spawn-group-4",
-        "entityType": "enemy",
-        "position": [0, 1, 10],
-        "count": 4,
-        "radius": 4,
-        "enabled": true
-      },
-      {
-        "id": "spawn-group-5",
-        "entityType": "enemy",
-        "position": [-15, 1, 5],
-        "count": 3,
-        "radius": 2.5,
-        "enabled": true
-      },
-      {
-        "id": "spawn-group-6",
-        "entityType": "enemy",
-        "position": [15, 1, -5],
-        "count": 3,
-        "radius": 2.5,
-        "enabled": true
       }
     ]
   }

@@ -156,8 +156,17 @@ export function useSocket(ticket, onTicketInvalid) {
       store.setTargetedEnemies([])
       store.clearDamageNumbers()
       
+      // Force position reset - this triggers GameCanvas to snap localPlayerPositionRef
+      if (data.position) {
+        const playerId = store.playerId
+        if (playerId) {
+          store.updatePlayer(playerId, { position: data.position })
+        }
+        // Set force position to trigger immediate snap in GameCanvas
+        store.setForcePosition(data.position)
+      }
+      
       // Server will send areaPlayers with updated hub state
-      // and playerJoined for this player to others
     })
     
     // MMO-style area state - receive all players in current area
@@ -167,7 +176,7 @@ export function useSocket(ticket, onTicketInvalid) {
       const playersMap = {}
       players.forEach(p => { 
         playersMap[p.id] = p 
-        console.log('Player in area:', p.id, p.username, p.shape, p.color)
+        console.log('Player in area:', p.id, p.username, 'position:', p.position)
       })
       store.setPlayers(playersMap)
     })
