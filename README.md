@@ -15,8 +15,6 @@
 
 [Quick Start](#-quick-start) • [Documentation](#-documentation) • [Features](#-features) • [Contributing](#-contributing)
 
-<img src="https://img.shields.io/badge/Status-Active_Development-brightgreen" alt="Status">
-
 
 https://github.com/user-attachments/assets/7d3fece9-768f-4e75-bc8a-5e86c1740e10
 
